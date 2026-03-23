@@ -1,0 +1,44 @@
+export default function Header({ title, syncing, lastSync, onSync, onLogout, onToggleSidebar }) {
+  const syncLabel = lastSync
+    ? `Synced ${timeAgo(new Date(lastSync))}`
+    : 'Never synced'
+
+  return (
+    <header className="header-bar">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={onToggleSidebar}
+          style={{ display: 'none' }}
+          // Show via CSS media query on mobile — or keep simple
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <h2 className="header-title">{title}</h2>
+      </div>
+      <div className="header-actions">
+        <div className="sync-pill">
+          <span className="sync-dot" style={syncing ? { animation: 'spin 1s linear infinite' } : {}} />
+          {syncing ? 'Syncing…' : syncLabel}
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={onSync} disabled={syncing}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+          Sync
+        </button>
+        <button className="btn btn-ghost btn-sm" style={{ color: 'var(--red)' }} onClick={onLogout}>
+          Logout
+        </button>
+      </div>
+    </header>
+  )
+}
+
+function timeAgo(date) {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}

@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Store {
+  id          String    @id @default(cuid())
+  shopDomain  String    @unique
+  accessToken String
+  createdAt   DateTime  @default(now())
+  lastProductsSyncAt DateTime?
+  lastOrdersSyncAt DateTime?
+
+
+  products    Product[]
+  variants    Variant[]
+  orders      Order[]
+}
+
+model Product {
+  id               String    @id @default(cuid())
+  shopifyProductId String    @unique
+  title            String
+  storeId          String
+  createdAt        DateTime  @default(now())
+
+  store            Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  variants         Variant[]
+}
+
+model Variant {
+  id               String      @id @default(cuid())
+  shopifyVariantId String      @unique
+  sku              String?
+  price            Float
+  cogs             Float?
+  previousPrice    Float?
+  inventoryQty     Int         @default(0)
+  productId        String
+  storeId          String
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  product          Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  store            Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  orderItems       OrderItem[]
+  snapshots        VariantSnapshot[]
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  shopifyOrderId String      @unique
+  storeId        String
+  orderNumber    String?
+  currency       String?
+  totalPrice     Float?
+  createdAt      DateTime
+  updatedAt      DateTime    @updatedAt
+
+  store          Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  items          OrderItem[]
+}
+
+model OrderItem {
+  id             String    @id @default(cuid())
+  orderId        String
+  variantId      String
+  quantity       Int
+  unitPrice      Float
+  lineTotal      Float?
+  createdAt      DateTime  @default(now())
+
+  order          Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant        Variant   @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, variantId])
+}
+
+model VariantSnapshot {
+  id            String    @id @default(cuid())
+  variantId     String
+  price         Float
+  cogs          Float?
+  inventoryQty  Int
+  unitsSold30d  Int       @default(0)
+  revenue30d    Float     @default(0)
+  capturedAt    DateTime  @default(now())
+
+  variant       Variant   @relation(fields: [variantId], references: [id], onDelete: Cascade)
+}
+
+model OAuthState {
+  id        String   @id @default(cuid())
+  state     String   @unique
+  shop      String
+  createdAt DateTime @default(now())
+}
