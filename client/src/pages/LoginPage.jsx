@@ -8,7 +8,7 @@ export default function LoginPage() {
     let val = shop.trim().toLowerCase()
     if (!val.endsWith('.myshopify.com')) val += '.myshopify.com'
     // Go directly to Express server for OAuth
-    window.location.href = `http://localhost:3000/auth?shop=${encodeURIComponent(val)}`
+    window.location.href = `https://marginpilot.co/auth?shop=${encodeURIComponent(val)}`
   }
 
   return (

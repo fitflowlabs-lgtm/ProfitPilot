@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:3000/api';
+const API_BASE = 'https://marginpilot.co/api';
 
 async function request(path, options = {}) {
   const url = `${API_BASE}${path}`;
