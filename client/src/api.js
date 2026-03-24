@@ -23,7 +23,7 @@ async function request(path, options = {}) {
 
 export const api = {
   // Session
-  me: (shop) => request(`/me${shop ? `?shop=${encodeURIComponent(shop)}` : ''}`),
+  me: (shop) => request(`/api/me${shop ? `?shop=${encodeURIComponent(shop)}` : ''}`),
   logout: () => request('/logout', { method: 'POST' }),
 
   // Sync
