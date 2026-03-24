@@ -482,12 +482,6 @@ app.post("/api/ai/deal", requireStore, aiRL, async (req, res) => {
   } catch (e) { res.status(500).json({error:e.message}); }
 });
 
-app.get('/', (req, res, next) => {
-  if (req.query.shop) {
-    return res.redirect(`/auth?shop=${encodeURIComponent(req.query.shop)}`);
-  }
-  next();
-});
 
 // -----------------------------
 // Production: Serve React
