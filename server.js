@@ -98,6 +98,7 @@ async function fetchShopifyJson(url, store) {
   const response = await fetch(url, { method: "GET", headers: { "X-Shopify-Access-Token": store.accessToken, "Content-Type": "application/json" } });
   let data = null;
   try { data = await response.json(); } catch (e) { data = null; }
+  console.log(data)
   if (response.status === 401) { const err = new Error("Shopify token expired"); err.code = "REAUTH_REQUIRED"; err.shop = store.shopDomain; throw err; }
   return { response, data };
 }
@@ -218,7 +219,7 @@ app.get("/auth/callback", async (req, res) => {
     await prisma.store.upsert({ where: { shopDomain: shop }, update: { accessToken: tokenData.access_token }, create: { shopDomain: shop, accessToken: tokenData.access_token } });
     req.session.shop = shop;
     try { await registerWebhooks(shop, tokenData.access_token); } catch (e) { console.error("Webhook registration failed:", e.message); }
-    res.redirect(`${process.env.CLIENT_URL || "http://localhost:5173"}?shop=${encodeURIComponent(shop)}`);
+    res.redirect(`${process.env.CLIENT_URL || "http://localhost:5173"}/dashboard?shop=${encodeURIComponent(shop)}`);
   } catch (error) { res.status(500).json({ error: "OAuth failed", details: error.message }); }
 });
 
