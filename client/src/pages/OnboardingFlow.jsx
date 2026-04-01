@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { api } from '../api'
 
 const PLATFORMS = [
   {
@@ -124,7 +125,7 @@ function StepIndicator({ current }) {
   )
 }
 
-function AccountStep({ onNext }) {
+function AccountStep({ onNext, onSwitch }) {
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' })
   const [errors, setErrors] = useState({})
   const [showPass, setShowPass] = useState(false)
@@ -142,7 +143,21 @@ function AccountStep({ onNext }) {
     return Object.keys(e).length === 0
   }
 
-  const handle = () => { if (validate()) onNext({ user: form }) }
+const handle = async () => {
+  if (!validate()) return
+
+  try {
+    const user = await api.register({
+      name: form.name,
+      email: form.email,
+      password: form.password,
+    })
+
+    onNext({ user }) // 👈 real user now
+  } catch (err) {
+    setErrors({ email: err.message || 'Failed to create account' })
+  }
+}
 
   const inputStyle = (key) => ({
     width: '100%', boxSizing: 'border-box',
@@ -188,9 +203,20 @@ function AccountStep({ onNext }) {
 
       <Btn primary onClick={handle} style={{ width: '100%', marginTop: '0.5rem' }}>Continue →</Btn>
       <p style={{ textAlign: 'center', marginTop: '1.1rem', fontSize: '13px', color: c.muted }}>
-        Already have an account?{' '}
-        <a href="#" style={{ color: c.accent, textDecoration: 'none', fontWeight: 500 }}>Sign in</a>
-      </p>
+  Already have an account?{' '}
+  <button
+    onClick={onSwitch}
+    style={{
+      background: 'none',
+      border: 'none',
+      color: c.accent,
+      cursor: 'pointer',
+      fontWeight: 500
+    }}
+  >
+    Sign in
+  </button>
+</p>
     </div>
   )
 }
@@ -394,7 +420,12 @@ export default function OnboardingFlow() {
         <div style={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: '14px', padding: '1.75rem 2rem' }}>
           <StepIndicator current={step} />
 
-          {step === 'account'   && <AccountStep  onNext={d => go('platforms', d)} />}
+          {step === 'account' && (
+  <AccountStep
+    onNext={d => go('platforms', d)}
+    onSwitch={() => window.location.reload()} // temp (or use App state)
+  />
+)}
           {step === 'platforms' && <PlatformStep onNext={d => go('connect', d)} onBack={() => setStep('account')} />}
           {step === 'connect'   && <ConnectStep  platforms={data.platforms || []} onNext={d => go('done', d)} onBack={() => setStep('platforms')} />}
           {step === 'done'      && <DoneStep userData={data} />}

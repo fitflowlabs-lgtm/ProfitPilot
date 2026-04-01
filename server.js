@@ -483,6 +483,8 @@ app.post("/api/ai/deal", requireStore, aiRL, async (req, res) => {
 });
 
 
+
+
 // -----------------------------
 // Production: Serve React
 // -----------------------------
@@ -492,6 +494,15 @@ if (process.env.NODE_ENV === "production") {
   app.use(express.static(dist));
   app.get(/^\/(?!api|auth|webhooks).*/, (req, res) => { res.sendFile(path.join(dist, "index.html")); });
 }
+
+const path = require("path");
+
+// Serve React build
+app.use(express.static(path.join(__dirname, "client/build")));
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "client/build/index.html"));
+});
 
 // Global error handler
 app.use((err, req, res, next) => { console.error("Unhandled:", err.message); res.status(500).json({ error: "Internal server error" }); });
