@@ -1,31 +1,35 @@
-import { useState } from 'react'
+export default function LoginPage({ onSwitch, onLogin }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
 
-export default function LoginPage() {
-  const [shop, setShop] = useState('')
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    let val = shop.trim().toLowerCase()
-    if (!val.endsWith('.myshopify.com')) val += '.myshopify.com'
-    // Go directly to Express server for OAuth
-    window.location.href = `https://marginpilot.co/auth?shop=${encodeURIComponent(val)}`
+  const handleLogin = async () => {
+    const user = await api.login({ email, password })
+    onLogin(user)
   }
 
   return (
-    <div className="login-page">
-      <div className="login-card">
+    <div className="auth-page">
+      <div className="auth-card">
         <h1>Margin Pilot</h1>
-        <p>Connect your Shopify store to get started</p>
-        <form onSubmit={handleSubmit}>
-          <input
-            type="text"
-            placeholder="your-store.myshopify.com"
-            value={shop}
-            onChange={(e) => setShop(e.target.value)}
-            required
-          />
-          <button type="submit">Connect with Shopify</button>
-        </form>
+
+        <input
+          placeholder="Email"
+          onChange={(e) => setEmail(e.target.value)}
+        />
+
+        <input
+          type="password"
+          placeholder="Password"
+          onChange={(e) => setPassword(e.target.value)}
+        />
+
+        <button onClick={handleLogin}>
+          Log In
+        </button>
+
+        <button className="btn-ghost" onClick={onSwitch}>
+          Create an account
+        </button>
       </div>
     </div>
   )
