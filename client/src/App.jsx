@@ -3,7 +3,7 @@ import { api } from './api'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import LoginPage from './pages/LoginPage'
-import OnboardingPage from "./pages/OnboardingPage"
+import OnboardingFlow from "./pages/OnboardingFlow"
 import DashboardPage from './pages/DashboardPage'
 import ProductsPage from './pages/ProductsPage'
 import RecommendationsPage from './pages/RecommendationsPage'
@@ -83,7 +83,7 @@ export default function App() {
     }
 
     return (
-      <OnboardingPage
+      <OnboardingFlow
         onSwitch={() => setAuthMode('login')}
         onComplete={(user) => setAuth(user)}
       />
