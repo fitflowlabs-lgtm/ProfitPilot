@@ -495,8 +495,6 @@ if (process.env.NODE_ENV === "production") {
   app.get(/^\/(?!api|auth|webhooks).*/, (req, res) => { res.sendFile(path.join(dist, "index.html")); });
 }
 
-const path = require("path");
-
 // Serve React build
 app.use(express.static(path.join(__dirname, "client/build")));
 
