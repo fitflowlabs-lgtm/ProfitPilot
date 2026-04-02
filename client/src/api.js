@@ -20,6 +20,11 @@ async function request(path, options = {}) {
   }
 
   if (!res.ok) {
+    if (data?.reauth) {
+      const confirmed = window.confirm("Your Shopify connection has expired. Would you like to reconnect?");
+      if (confirmed) window.location.href = data.redirect;
+      return null;
+    }
     if (data?.redirect) {
       window.location.href = data.redirect;
       return null;
