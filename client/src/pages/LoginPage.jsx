@@ -4,6 +4,7 @@ import { api } from '../api'
 export default function LoginPage({ onSwitch, onNeedsShopify, onLogin }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -13,7 +14,7 @@ export default function LoginPage({ onSwitch, onNeedsShopify, onLogin }) {
     setError('')
     setLoading(true)
     try {
-      const result = await api.login({ email, password })
+      const result = await api.login({ email, password, rememberMe })
       if (result?.authenticated) {
         onLogin(result)
       } else if (result?.needsShopify) {
@@ -66,6 +67,19 @@ export default function LoginPage({ onSwitch, onNeedsShopify, onLogin }) {
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
           />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '14px' }}>
+            <input
+              type="checkbox"
+              id="rememberMe"
+              className="custom-check"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+            />
+            <label htmlFor="rememberMe" style={{ fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}>
+              Remember me for 30 days
+            </label>
+          </div>
 
           {error && (
             <div style={{ marginTop: '10px', padding: '10px 14px', background: 'var(--red-bg)', border: '1px solid var(--red-border)', borderRadius: '8px', fontSize: '13px', color: 'var(--red)' }}>

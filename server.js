@@ -7,7 +7,11 @@ const bcrypt = require("bcryptjs");
 const OpenAI = require("openai");
 const prisma = require("./src/db");
 const session = require("express-session");
+const pgSession = require("connect-pg-simple")(session);
+const { Pool } = require("pg");
 const app = express();
+
+const pgPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false });
 
 // -----------------------------
 // Middleware
@@ -26,12 +30,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(
   session({
+    store: new pgSession({ pool: pgPool, tableName: "session", createTableIfMissing: true }),
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
+      httpOnly: true,
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       secure: process.env.NODE_ENV === "production",
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours by default
     },
   })
 );
@@ -291,7 +298,7 @@ app.post("/api/register", async (req, res) => {
 });
 
 app.post("/api/login", async (req, res) => {
-  const { email, password } = req.body || {};
+  const { email, password, rememberMe } = req.body || {};
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
   }
@@ -300,6 +307,9 @@ app.post("/api/login", async (req, res) => {
     if (!user) return res.status(401).json({ error: "Invalid email or password" });
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return res.status(401).json({ error: "Invalid email or password" });
+    if (rememberMe) {
+      req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
+    }
     req.session.userId = user.id;
     // First try to find a store already linked to this user
     let store = await prisma.store.findFirst({ where: { userId: user.id } });
