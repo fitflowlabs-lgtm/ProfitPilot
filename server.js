@@ -25,7 +25,7 @@ app.use(
 );
 
 // Raw body for webhook HMAC verification — MUST be before express.json()
-app.use("/webhooks", express.raw({ type: "application/json" }));
+app.use(["/webhooks", "/api/webhooks/stripe"], express.raw({ type: "application/json" }));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -44,6 +44,8 @@ app.use(
   })
 );
 
+const Stripe = require("stripe");
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const PORT = process.env.PORT || 3000;
 
@@ -323,7 +325,14 @@ app.get("/api/me", async (req, res) => {
       } catch (e) { console.error("shopName backfill failed:", e.message); }
     }
     req.session.shop = shop;
-    res.json({ authenticated: true, shop: store.shopDomain, shopName: store.shopName, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt });
+    let plan = "free";
+    if (req.session.userId) {
+      try {
+        const u = await prisma.user.findUnique({ where: { id: req.session.userId }, select: { plan: true } });
+        if (u) plan = u.plan;
+      } catch (_) {}
+    }
+    res.json({ authenticated: true, shop: store.shopDomain, shopName: store.shopName, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt, plan });
   } catch (e) {
     console.error("/api/me error:", e.message);
     res.status(500).json({ error: "Session check failed: " + e.message });
@@ -379,7 +388,7 @@ app.post("/api/login", async (req, res) => {
     }
     if (store) {
       req.session.shop = store.shopDomain;
-      return res.json({ authenticated: true, shop: store.shopDomain, shopName: store.shopName, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt });
+      return res.json({ authenticated: true, shop: store.shopDomain, shopName: store.shopName, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt, plan: user.plan || "free" });
     }
     res.json({ authenticated: false, needsShopify: true });
   } catch (e) {
@@ -676,6 +685,85 @@ app.post("/api/ai/deal", requireStore, aiRL, async (req, res) => {
 
 
 
+
+// -----------------------------
+// Stripe
+// -----------------------------
+app.post("/api/stripe/create-checkout-session", async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
+  const { plan } = req.body;
+  if (!["basic", "pro"].includes(plan)) return res.status(400).json({ error: "Invalid plan" });
+  const priceId = plan === "pro" ? process.env.STRIPE_PRO_PRICE_ID : process.env.STRIPE_BASIC_PRICE_ID;
+  const baseUrl = process.env.CLIENT_URL || "http://localhost:5173";
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.session.userId } });
+    const params = {
+      mode: "subscription",
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/pricing`,
+      metadata: { userId: user.id, plan },
+    };
+    if (user.stripeCustomerId) {
+      params.customer = user.stripeCustomerId;
+    } else {
+      params.customer_email = user.email;
+    }
+    const session = await stripe.checkout.sessions.create(params);
+    res.json({ url: session.url });
+  } catch (e) {
+    console.error("Stripe checkout error:", e.message);
+    res.status(500).json({ error: "Failed to create checkout session" });
+  }
+});
+
+app.get("/api/stripe/subscription", async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.session.userId }, select: { plan: true } });
+    res.json({ plan: user?.plan || "free" });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/webhooks/stripe", async (req, res) => {
+  const sig = req.headers["stripe-signature"];
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (e) {
+    console.error("Stripe webhook signature error:", e.message);
+    return res.status(400).send(`Webhook Error: ${e.message}`);
+  }
+  try {
+    if (event.type === "checkout.session.completed") {
+      const s = event.data.object;
+      const { userId, plan } = s.metadata || {};
+      if (userId && plan) {
+        await prisma.user.update({ where: { id: userId }, data: { plan, stripeCustomerId: s.customer, stripeSubscriptionId: s.subscription } });
+      }
+    } else if (event.type === "customer.subscription.updated") {
+      const sub = event.data.object;
+      const user = await prisma.user.findFirst({ where: { stripeSubscriptionId: sub.id } });
+      if (user) {
+        const active = sub.status === "active" || sub.status === "trialing";
+        const newPlan = active ? (sub.items.data[0]?.price?.id === process.env.STRIPE_PRO_PRICE_ID ? "pro" : "basic") : "free";
+        await prisma.user.update({ where: { id: user.id }, data: { plan: newPlan } });
+      }
+    } else if (event.type === "customer.subscription.deleted") {
+      const sub = event.data.object;
+      const user = await prisma.user.findFirst({ where: { stripeSubscriptionId: sub.id } });
+      if (user) {
+        await prisma.user.update({ where: { id: user.id }, data: { plan: "free", stripeSubscriptionId: null } });
+      }
+    }
+  } catch (e) {
+    console.error("Stripe webhook handler error:", e.message);
+    return res.status(500).send("Handler error");
+  }
+  res.json({ received: true });
+});
 
 // -----------------------------
 // Production: Serve React

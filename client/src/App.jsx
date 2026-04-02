@@ -10,12 +10,15 @@ import ProductsPage from './pages/ProductsPage'
 import RecommendationsPage from './pages/RecommendationsPage'
 import InventoryPage from './pages/InventoryPage'
 import DealsPage from './pages/DealsPage'
+import PricingPage from './pages/PricingPage'
+import PaymentSuccessPage from './pages/PaymentSuccessPage'
 const PAGE_TITLES = {
   dashboard: 'Dashboard',
   products: 'Products & Costs',
   recommendations: 'Pricing & Margins',
   inventory: 'Inventory',
   deals: 'Deal Simulator',
+  pricing: 'Plans & Billing',
 }
 
 export default function App() {
@@ -29,6 +32,14 @@ export default function App() {
 
   const [storeError, setStoreError] = useState(null)
   const [storeErrorShop, setStoreErrorShop] = useState(null)
+
+  useEffect(() => {
+    if (window.location.pathname === '/payment/success') {
+      setActivePage('payment-success')
+    } else if (window.location.pathname === '/pricing') {
+      setActivePage('pricing')
+    }
+  }, [])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -72,6 +83,11 @@ export default function App() {
     }
     setSyncing(false)
   }, [auth, syncing])
+
+  // 💳 PAYMENT SUCCESS (no auth shell needed)
+  if (activePage === 'payment-success') {
+    return <PaymentSuccessPage onContinue={() => { window.history.replaceState({}, '', '/'); setActivePage('dashboard') }} />
+  }
 
   // 🔄 LOADING
   if (auth === null) {
@@ -124,6 +140,7 @@ export default function App() {
       case 'recommendations': return <RecommendationsPage {...props} />
       case 'inventory': return <InventoryPage {...props} />
       case 'deals': return <DealsPage {...props} />
+      case 'pricing': return <PricingPage currentPlan={auth.plan || 'free'} />
       default: return <DashboardPage {...props} onNavigate={setActivePage} />
     }
   }
@@ -136,6 +153,7 @@ export default function App() {
         shop={auth.shop}
         shopName={auth.shopName}
         isOpen={sidebarOpen}
+        plan={auth.plan}
       />
 
       <main className="main-content">

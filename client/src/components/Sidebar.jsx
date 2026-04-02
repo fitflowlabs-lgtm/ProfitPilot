@@ -1,4 +1,4 @@
-export default function Sidebar({ activePage, onNavigate, shop, shopName, isOpen }) {
+export default function Sidebar({ activePage, onNavigate, shop, shopName, isOpen, plan }) {
   const displayName = shopName || (shop ? shop.replace('.myshopify.com', '').replace(/-/g, ' ') : 'Unknown')
   const initial = displayName.charAt(0).toUpperCase()
 
@@ -44,6 +44,20 @@ export default function Sidebar({ activePage, onNavigate, shop, shopName, isOpen
       </nav>
 
       <div className="sidebar-footer">
+        {(!plan || plan === 'free') && (
+          <button
+            onClick={() => onNavigate('pricing')}
+            style={{
+              width: '100%', marginBottom: 12, padding: '9px 14px',
+              background: 'linear-gradient(135deg, var(--accent), #6366f1)',
+              border: 'none', borderRadius: 8, color: '#fff',
+              fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
+              letterSpacing: '0.02em',
+            }}
+          >
+            ✦ Upgrade to Pro
+          </button>
+        )}
         <div className="store-badge">
           <div className="store-avatar">{initial}</div>
           <div className="store-info">
