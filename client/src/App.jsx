@@ -114,6 +114,7 @@ export default function App() {
         activePage={activePage}
         onNavigate={setActivePage}
         shop={auth.shop}
+        shopName={auth.shopName}
         isOpen={sidebarOpen}
       />
 

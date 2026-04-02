@@ -1,6 +1,6 @@
-export default function Sidebar({ activePage, onNavigate, shop, isOpen }) {
-  const initial = shop ? shop.charAt(0).toUpperCase() : '?'
-  const displayName = shop ? shop.replace('.myshopify.com', '') : 'Unknown'
+export default function Sidebar({ activePage, onNavigate, shop, shopName, isOpen }) {
+  const displayName = shopName || (shop ? shop.replace('.myshopify.com', '').replace(/-/g, ' ') : 'Unknown')
+  const initial = displayName.charAt(0).toUpperCase()
 
   const navItems = [
     { section: 'Overview', items: [

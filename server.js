@@ -223,8 +223,15 @@ app.get("/auth/callback", async (req, res) => {
     const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ client_id: process.env.SHOPIFY_API_KEY, client_secret: process.env.SHOPIFY_API_SECRET, code }) });
     const tokenData = await tokenRes.json();
     if (!tokenRes.ok || !tokenData.access_token) return res.status(400).json({ error: "OAuth failed", details: tokenData });
+    // Fetch the real store name from Shopify
+    let shopName = null;
+    try {
+      const shopRes = await fetch(`https://${shop}/admin/api/2024-01/shop.json`, { headers: { "X-Shopify-Access-Token": tokenData.access_token } });
+      const shopData = await shopRes.json();
+      shopName = shopData?.shop?.name || null;
+    } catch (e) { console.error("Could not fetch shop name:", e.message); }
     const userId = req.session.userId || null;
-    await prisma.store.upsert({ where: { shopDomain: shop }, update: { accessToken: tokenData.access_token, ...(userId ? { userId } : {}) }, create: { shopDomain: shop, accessToken: tokenData.access_token, ...(userId ? { userId } : {}) } });
+    await prisma.store.upsert({ where: { shopDomain: shop }, update: { accessToken: tokenData.access_token, ...(shopName ? { shopName } : {}), ...(userId ? { userId } : {}) }, create: { shopDomain: shop, accessToken: tokenData.access_token, ...(shopName ? { shopName } : {}), ...(userId ? { userId } : {}) } });
     req.session.shop = shop;
     try { await registerWebhooks(shop, tokenData.access_token); } catch (e) { console.error("Webhook registration failed:", e.message); }
     res.redirect(`${process.env.CLIENT_URL || "http://localhost:5173"}/?shop=${encodeURIComponent(shop)}`);
@@ -268,10 +275,20 @@ app.post("/webhooks/app-uninstalled", async (req, res) => {
 app.get("/api/me", async (req, res) => {
   const shop = req.query.shop || req.session.shop;
   if (!shop) return res.json({ authenticated: false });
-  const store = await prisma.store.findUnique({ where: { shopDomain: shop } });
+  let store = await prisma.store.findUnique({ where: { shopDomain: shop } });
   if (!store) return res.json({ authenticated: false, shop });
+  // Backfill shopName if missing
+  if (!store.shopName) {
+    try {
+      const shopRes = await fetch(`https://${shop}/admin/api/2024-01/shop.json`, { headers: { "X-Shopify-Access-Token": store.accessToken } });
+      const shopData = await shopRes.json();
+      if (shopData?.shop?.name) {
+        store = await prisma.store.update({ where: { id: store.id }, data: { shopName: shopData.shop.name } });
+      }
+    } catch (e) { console.error("shopName backfill failed:", e.message); }
+  }
   req.session.shop = shop;
-  res.json({ authenticated: true, shop: store.shopDomain, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt });
+  res.json({ authenticated: true, shop: store.shopDomain, shopName: store.shopName, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt });
 });
 
 app.post("/api/logout", (req, res) => { req.session.destroy(() => { res.json({ ok: true }); }); });
@@ -323,7 +340,7 @@ app.post("/api/login", async (req, res) => {
     }
     if (store) {
       req.session.shop = store.shopDomain;
-      return res.json({ authenticated: true, shop: store.shopDomain, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt });
+      return res.json({ authenticated: true, shop: store.shopDomain, shopName: store.shopName, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt });
     }
     res.json({ authenticated: false, needsShopify: true });
   } catch (e) {
