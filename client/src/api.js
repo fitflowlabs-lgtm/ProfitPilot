@@ -94,8 +94,8 @@ export const api = {
     }),
 
   // Stripe
-  createCheckoutSession: (plan) =>
-    request("/stripe/create-checkout-session", { method: "POST", body: JSON.stringify({ plan }) }),
+  createCheckoutSession: () =>
+    request("/stripe/create-checkout-session", { method: "POST", body: JSON.stringify({}) }),
   getSubscription: () => request("/stripe/subscription"),
 
   // AI

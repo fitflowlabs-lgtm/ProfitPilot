@@ -691,9 +691,11 @@ app.post("/api/ai/deal", requireStore, aiRL, async (req, res) => {
 // -----------------------------
 app.post("/api/stripe/create-checkout-session", async (req, res) => {
   if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-  const { plan } = req.body;
-  if (!["basic", "pro"].includes(plan)) return res.status(400).json({ error: "Invalid plan" });
-  const priceId = plan === "pro" ? process.env.STRIPE_PRO_PRICE_ID : process.env.STRIPE_BASIC_PRICE_ID;
+  const priceId = process.env.STRIPE_PRICE_ID;
+  if (!priceId) {
+    console.error("STRIPE_PRICE_ID env var is not set");
+    return res.status(500).json({ error: "Stripe is not configured. Contact support." });
+  }
   const baseUrl = process.env.CLIENT_URL || "http://localhost:5173";
   try {
     const user = await prisma.user.findUnique({ where: { id: req.session.userId } });
@@ -701,8 +703,8 @@ app.post("/api/stripe/create-checkout-session", async (req, res) => {
       mode: "subscription",
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/pricing`,
-      metadata: { userId: user.id, plan },
+      cancel_url: `${baseUrl}/`,
+      metadata: { userId: user.id, plan: "pro" },
     };
     if (user.stripeCustomerId) {
       params.customer = user.stripeCustomerId;
@@ -748,7 +750,7 @@ app.post("/api/webhooks/stripe", async (req, res) => {
       const user = await prisma.user.findFirst({ where: { stripeSubscriptionId: sub.id } });
       if (user) {
         const active = sub.status === "active" || sub.status === "trialing";
-        const newPlan = active ? (sub.items.data[0]?.price?.id === process.env.STRIPE_PRO_PRICE_ID ? "pro" : "basic") : "free";
+        const newPlan = active ? "pro" : "free";
         await prisma.user.update({ where: { id: user.id }, data: { plan: newPlan } });
       }
     } else if (event.type === "customer.subscription.deleted") {
