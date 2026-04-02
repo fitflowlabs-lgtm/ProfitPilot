@@ -16,6 +16,7 @@ const pgPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: proce
 // -----------------------------
 // Middleware
 // -----------------------------
+app.set("trust proxy", 1);
 app.use(
   cors({
     origin: process.env.CLIENT_URL || "http://localhost:5173",
