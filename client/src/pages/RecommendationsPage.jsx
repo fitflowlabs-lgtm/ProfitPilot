@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api'
 import { StatusBadge, Loading, AICard, AIButton, formatCurrency, formatPercent, marginColor } from '../components/UI'
-import Disclaimer from '../components/Disclaimer'
 
 export default function RecommendationsPage({ shop, refreshKey }) {
   const [recs, setRecs] = useState(null)
@@ -164,7 +163,6 @@ export default function RecommendationsPage({ shop, refreshKey }) {
           </table>
         </div>
       </div>
-      <Disclaimer />
     </div>
   )
 }
