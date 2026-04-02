@@ -48,7 +48,6 @@ export default function Sidebar({ activePage, onNavigate, shop, shopName, isOpen
           <div className="store-avatar">{initial}</div>
           <div className="store-info">
             <div className="store-name">{displayName}</div>
-            <div className="store-domain">{shop}</div>
           </div>
         </div>
       </div>
