@@ -188,6 +188,37 @@ async function autoSyncIfNeeded(store) {
   return prisma.store.findUnique({ where: { id: store.id } });
 }
 
+// Cost sanity check — returns true if cost looks like a data-entry error
+function isUnusualCost(title, price, cost) {
+  if (cost == null || cost <= 0) return false;
+  // Cost at or above price is clearly wrong
+  if (cost >= price) return true;
+  // Cost is 95%+ of price — no realistic margin possible
+  if (price > 0 && cost / price > 0.95) return true;
+  // Category-specific upper bounds
+  const t = title.toLowerCase();
+  const caps = [
+    { kw: ['t-shirt','tshirt','tee','tank top'], max: 80 },
+    { kw: ['shirt','blouse','polo'], max: 120 },
+    { kw: ['pants','jeans','shorts','leggings','trousers'], max: 150 },
+    { kw: ['dress','skirt'], max: 200 },
+    { kw: ['hoodie','sweater','sweatshirt','jacket','coat'], max: 250 },
+    { kw: ['socks','underwear','bra','briefs'], max: 50 },
+    { kw: ['hat','cap','beanie'], max: 80 },
+    { kw: ['book','novel','guide','manual','journal'], max: 50 },
+    { kw: ['candle','soap','lotion','cream','serum'], max: 100 },
+    { kw: ['mug','cup','tumbler','bottle'], max: 80 },
+    { kw: ['poster','print','art'], max: 100 },
+    { kw: ['phone case','phone cover'], max: 60 },
+    { kw: ['sticker','patch','pin','badge'], max: 20 },
+    { kw: ['earring','necklace','bracelet','ring'], max: 200 },
+  ];
+  for (const { kw, max } of caps) {
+    if (kw.some((k) => t.includes(k)) && cost > max) return true;
+  }
+  return false;
+}
+
 function getSeasonalMultiplier(title) {
   const m = new Date().getMonth() + 1;
   const t = title.toLowerCase();
@@ -433,19 +464,65 @@ app.put("/api/products/:variantId/cost", requireStore, async (req, res) => {
 // -----------------------------
 app.get("/api/recommendations", requireStore, async (req, res) => {
   try {
-    const store = await autoSyncIfNeeded(req.store); const targetMargin = 0.6;
+    const store = await autoSyncIfNeeded(req.store);
+    const TARGET_MARGIN = 0.6; // 60% — green zone floor
     const variants = await prisma.variant.findMany({ where: { storeId: store.id }, include: { product: true }, orderBy: { product: { title: "asc" } } });
     const recommendations = variants.map((v) => {
-      const price = Number(v.price || 0), cost = v.cogs == null ? null : Number(v.cogs);
-      if (cost === null || price <= 0) return { variantId: v.id, previousPrice: v.previousPrice ?? null, productTitle: v.product.title, sku: v.sku || "Default", currentPrice: price, cost, currentMargin: null, suggestedPrice: null, priceDifference: null, recommendation: "Enter a cost first", status: "missing_cost" };
-      const currentProfit = price - cost, currentMargin = (currentProfit / price) * 100, suggestedPrice = cost / (1 - targetMargin), priceDifference = suggestedPrice - price;
-      let recommendation = "Price looks solid", status = "good";
-      if (currentProfit < 0) { recommendation = "Losing money — raise price immediately"; status = "losing"; } else if (currentMargin < 40) { recommendation = `Increase price by $${priceDifference.toFixed(2)}`; status = "low"; } else if (currentMargin < 60) { recommendation = `Consider increasing price by $${Math.max(priceDifference, 0).toFixed(2)}`; status = "okay"; } else if (priceDifference < -0.01) { recommendation = `Could lower price by $${Math.abs(priceDifference).toFixed(2)}`; }
-      return { variantId: v.id, previousPrice: v.previousPrice ?? null, productTitle: v.product.title, sku: v.sku || "Default", currentPrice: price, cost, currentMargin: Math.round(currentMargin * 100) / 100, suggestedPrice: Math.round(suggestedPrice * 100) / 100, priceDifference: Math.round(priceDifference * 100) / 100, recommendation, status };
+      const price = Number(v.price || 0);
+      const cost = v.cogs == null ? null : Number(v.cogs);
+
+      if (cost === null || price <= 0) {
+        return { variantId: v.id, previousPrice: v.previousPrice ?? null, productTitle: v.product.title, sku: v.sku || "Default", currentPrice: price, cost, currentMargin: null, suggestedPrice: null, priceDifference: null, recommendation: "Enter a cost first", status: "missing_cost", unusualCost: false };
+      }
+
+      // Sanity check cost before computing anything
+      const unusualCost = isUnusualCost(v.product.title, price, cost);
+      if (unusualCost) {
+        return { variantId: v.id, previousPrice: v.previousPrice ?? null, productTitle: v.product.title, sku: v.sku || "Default", currentPrice: price, cost, currentMargin: null, suggestedPrice: null, priceDifference: null, recommendation: "Unusual cost — please verify before acting", status: "missing_cost", unusualCost: true };
+      }
+
+      const currentProfit = price - cost;
+      const currentMargin = (currentProfit / price) * 100;
+      // suggestedPrice always targets exactly 60% margin
+      const suggestedPrice = cost / (1 - TARGET_MARGIN);
+      const priceDifference = suggestedPrice - price;
+
+      let recommendation, status;
+      if (currentProfit < 0) {
+        recommendation = `Losing money — raise to ${formatServerCurrency(suggestedPrice)} for 60% margin`;
+        status = "losing";
+      } else if (currentMargin < 40) {
+        recommendation = `Low margin — raise to ${formatServerCurrency(suggestedPrice)} (+${formatServerCurrency(priceDifference)})`;
+        status = "low";
+      } else if (currentMargin < 60) {
+        recommendation = `Below target — consider ${formatServerCurrency(suggestedPrice)} (+${formatServerCurrency(priceDifference)}) for 60% margin`;
+        status = "okay";
+      } else {
+        // Already at or above 60% — don't suggest lowering below the green zone
+        recommendation = "Price looks solid";
+        status = "good";
+      }
+
+      return {
+        variantId: v.id, previousPrice: v.previousPrice ?? null,
+        productTitle: v.product.title, sku: v.sku || "Default",
+        currentPrice: price, cost,
+        currentMargin: Math.round(currentMargin * 100) / 100,
+        // Only expose suggestedPrice when it would improve margin (don't suggest lowering good prices)
+        suggestedPrice: status !== "good" ? Math.round(suggestedPrice * 100) / 100 : null,
+        priceDifference: status !== "good" ? Math.round(priceDifference * 100) / 100 : null,
+        recommendation, status, unusualCost: false,
+      };
     });
     res.json({ recommendations });
   } catch (e) { const h = handleShopifyError(e, res, req.store.shopDomain); if (h) return; res.status(500).json({ error: e.message }); }
 });
+
+function formatServerCurrency(val) {
+  if (val == null) return "—";
+  const n = Number(val);
+  return n < 0 ? `-$${Math.abs(n).toFixed(2)}` : `$${n.toFixed(2)}`;
+}
 
 // -----------------------------
 // API: Prices
@@ -555,8 +632,15 @@ app.post("/api/ai/product/:variantId", requireStore, aiRL, async (req, res) => {
   try {
     const v = await prisma.variant.findUnique({ where:{id:req.params.variantId}, include:{product:true} });
     if (!v||v.storeId!==req.store.id) return res.status(404).json({error:"Variant not found"});
-    const p=v.price,co=v.cogs??null,pr=co==null?null:p-co,mp=co==null||p<=0?null:(pr/p)*100;
-    const c = await openai.chat.completions.create({ model:"gpt-4.1-mini", messages:[{role:"system",content:"You are an expert ecommerce margin and pricing strategist."},{role:"user",content:`Analyze this product: 1) Profitability assessment 2) Raise/lower/keep price? 3) Lower cost? 4) One action. Be concise.\n\n${JSON.stringify({productTitle:v.product.title,sku:v.sku,price:p,cost:co,profit:pr,marginPercent:mp},null,2)}`}], temperature:0.7 });
+    const p=v.price, co=v.cogs??null, pr=co==null?null:p-co, mp=co==null||p<=0?null:(pr/p)*100;
+    const TARGET_MARGIN = 0.6;
+    const suggestedPrice = co != null ? Math.round((co / (1 - TARGET_MARGIN)) * 100) / 100 : null;
+    const unusualCost = co != null ? isUnusualCost(v.product.title, p, co) : false;
+    const payload = { productTitle:v.product.title, sku:v.sku, currentPrice:p, cost:co, profit:pr, marginPercent:mp, suggestedPriceForTarget60PctMargin:suggestedPrice, unusualCostFlagged:unusualCost };
+    const c = await openai.chat.completions.create({ model:"gpt-4.1-mini", messages:[
+      {role:"system", content:"You are an expert ecommerce margin and pricing strategist. The app has already calculated a suggested price to hit a 60% margin target — always reference this exact figure when recommending a price change. Never suggest a price that would result in less than 60% margin. If unusualCostFlagged is true, lead with a warning that the cost looks unusual."},
+      {role:"user", content:`Analyze this product: 1) Profitability assessment 2) Should the price change? If so, state the exact suggested price from the data 3) Any cost reduction opportunities? 4) One clear action. Be concise.\n\n${JSON.stringify(payload,null,2)}`}
+    ], temperature:0.7 });
     res.json({ analysis: c.choices?.[0]?.message?.content || "No analysis." });
   } catch (e) { res.status(500).json({error:e.message}); }
 });

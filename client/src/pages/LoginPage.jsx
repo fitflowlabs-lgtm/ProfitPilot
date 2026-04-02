@@ -15,16 +15,19 @@ export default function LoginPage({ onSwitch, onNeedsShopify, onLogin }) {
     setLoading(true)
     try {
       const result = await api.login({ email, password, rememberMe })
-      if (result?.authenticated) {
+      if (!result) {
+        setError('Login failed. Please try again.')
+        return
+      }
+      if (result.authenticated) {
         onLogin(result)
-      } else if (result?.needsShopify) {
-        // Credentials valid but no Shopify store linked yet — skip to connect step
+      } else if (result.needsShopify) {
         onNeedsShopify()
       } else {
-        onSwitch()
+        setError(result.error || 'Login failed. Please try again.')
       }
     } catch (err) {
-      setError(err.message || 'Login failed. Please try again.')
+      setError(err.message || 'Invalid email or password.')
     } finally {
       setLoading(false)
     }
@@ -68,17 +71,26 @@ export default function LoginPage({ onSwitch, onNeedsShopify, onLogin }) {
             autoComplete="current-password"
           />
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '14px' }}>
-            <input
-              type="checkbox"
-              id="rememberMe"
-              className="custom-check"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-            />
-            <label htmlFor="rememberMe" style={{ fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}>
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: '9px', marginTop: '14px', cursor: 'pointer' }}
+            onClick={() => setRememberMe((v) => !v)}
+          >
+            <div style={{
+              width: 17, height: 17, borderRadius: 4, flexShrink: 0,
+              background: rememberMe ? 'var(--accent)' : 'var(--surface-raised)',
+              border: `1.5px solid ${rememberMe ? 'var(--accent)' : 'var(--border)'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all 0.15s',
+            }}>
+              {rememberMe && (
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <path d="M1.5 5l2.5 2.5 4.5-5" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+            </div>
+            <span style={{ fontSize: '13px', color: 'var(--text-secondary)', userSelect: 'none' }}>
               Remember me for 30 days
-            </label>
+            </span>
           </div>
 
           {error && (

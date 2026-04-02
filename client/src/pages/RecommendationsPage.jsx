@@ -123,8 +123,16 @@ export default function RecommendationsPage({ shop, refreshKey }) {
                     <td className="text-right mono" style={{ color: diffColor }}>
                       {r.priceDifference != null ? `${r.priceDifference > 0 ? '+' : ''}${formatCurrency(r.priceDifference)}` : '—'}
                     </td>
-                    <td style={{ fontSize: '0.82rem', color: marginColor(r.currentMargin), maxWidth: 200 }}>
-                      {r.recommendation}
+                    <td style={{ fontSize: '0.82rem', maxWidth: 220 }}>
+                      {r.unusualCost && (
+                        <span style={{ display: 'inline-block', marginBottom: 3, padding: '2px 7px', borderRadius: 4, fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.04em', background: 'var(--yellow-bg)', color: 'var(--yellow)', border: '1px solid var(--yellow-border)' }}>
+                          ⚠ Verify cost
+                        </span>
+                      )}
+                      {r.unusualCost && <br />}
+                      <span style={{ color: r.unusualCost ? 'var(--yellow)' : marginColor(r.currentMargin) }}>
+                        {r.recommendation}
+                      </span>
                     </td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
