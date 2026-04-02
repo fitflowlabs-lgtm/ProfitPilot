@@ -389,8 +389,8 @@ function DoneStep({ userData }) {
   )
 }
 
-export default function OnboardingFlow() {
-  const [step, setStep] = useState('account')
+export default function OnboardingFlow({ initialStep = 'account', onSwitch }) {
+  const [step, setStep] = useState(initialStep)
   const [data, setData] = useState({})
 
   const go = (nextStep, newData = {}) => {
@@ -421,11 +421,11 @@ export default function OnboardingFlow() {
           <StepIndicator current={step} />
 
           {step === 'account' && (
-  <AccountStep
-    onNext={d => go('platforms', d)}
-    onSwitch={() => window.location.reload()} // temp (or use App state)
-  />
-)}
+            <AccountStep
+              onNext={d => go('platforms', d)}
+              onSwitch={onSwitch}
+            />
+          )}
           {step === 'platforms' && <PlatformStep onNext={d => go('connect', d)} onBack={() => setStep('account')} />}
           {step === 'connect'   && <ConnectStep  platforms={data.platforms || []} onNext={d => go('done', d)} onBack={() => setStep('platforms')} />}
           {step === 'done'      && <DoneStep userData={data} />}

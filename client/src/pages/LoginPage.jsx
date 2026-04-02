@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api'
 
-export default function LoginPage({ onSwitch, onLogin }) {
+export default function LoginPage({ onSwitch, onNeedsShopify, onLogin }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -16,8 +16,10 @@ export default function LoginPage({ onSwitch, onLogin }) {
       const result = await api.login({ email, password })
       if (result?.authenticated) {
         onLogin(result)
+      } else if (result?.needsShopify) {
+        // Credentials valid but no Shopify store linked yet — skip to connect step
+        onNeedsShopify()
       } else {
-        // Credentials valid but no Shopify store linked yet — go to onboarding
         onSwitch()
       }
     } catch (err) {

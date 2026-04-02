@@ -22,7 +22,8 @@ const PAGE_TITLES = {
 
 export default function App() {
   const [auth, setAuth] = useState(null)
-  const [authMode, setAuthMode] = useState('login') // 👈 NEW
+  const [authMode, setAuthMode] = useState('login')
+  const [onboardingStep, setOnboardingStep] = useState('account')
   const [activePage, setActivePage] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)
@@ -71,12 +72,13 @@ export default function App() {
     )
   }
 
-  // 🔐 AUTH FLOW (NEW)
+  // 🔐 AUTH FLOW
   if (auth === false) {
     if (authMode === 'login') {
       return (
         <LoginPage
-          onSwitch={() => setAuthMode('onboarding')}
+          onSwitch={() => { setOnboardingStep('account'); setAuthMode('onboarding') }}
+          onNeedsShopify={() => { setOnboardingStep('connect'); setAuthMode('onboarding') }}
           onLogin={(user) => setAuth(user)}
         />
       )
@@ -84,6 +86,7 @@ export default function App() {
 
     return (
       <OnboardingFlow
+        initialStep={onboardingStep}
         onSwitch={() => setAuthMode('login')}
         onComplete={(user) => setAuth(user)}
       />
