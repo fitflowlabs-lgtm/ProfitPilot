@@ -20,7 +20,7 @@ const PAGE_TITLES = {
   deals: 'Deal Simulator',
 }
 
-function PaywallOverlay() {
+function PaywallOverlay({ onLogout }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -38,9 +38,9 @@ function PaywallOverlay() {
 
   return (
     <div style={{
-      position: 'absolute', inset: 0, zIndex: 50,
-      background: 'rgba(11, 14, 17, 0.75)',
-      backdropFilter: 'blur(2px)',
+      position: 'fixed', inset: 0, zIndex: 999,
+      background: 'rgba(11, 14, 17, 0.85)',
+      backdropFilter: 'blur(6px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       padding: '24px',
     }}>
@@ -107,6 +107,13 @@ function PaywallOverlay() {
         <p style={{ marginTop: 12, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
           Secure payments via Stripe · Cancel anytime
         </p>
+
+        <button
+          onClick={onLogout}
+          style={{ marginTop: 16, background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.8rem', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+        >
+          Sign out
+        </button>
       </div>
     </div>
   )
@@ -262,17 +269,16 @@ export default function App() {
           onToggleSidebar={() => setSidebarOpen((o) => !o)}
         />
 
-        <div style={{ position: 'relative', flex: 1, minHeight: 0 }}>
-          <div style={{
-            filter: isPaid ? 'none' : 'blur(4px)',
-            pointerEvents: isPaid ? 'auto' : 'none',
-            userSelect: isPaid ? 'auto' : 'none',
-          }}>
-            {renderPage()}
-          </div>
-          {!isPaid && <PaywallOverlay />}
+        <div style={{
+          filter: isPaid ? 'none' : 'blur(4px)',
+          pointerEvents: isPaid ? 'auto' : 'none',
+          userSelect: isPaid ? 'auto' : 'none',
+        }}>
+          {renderPage()}
         </div>
       </main>
+
+      {!isPaid && <PaywallOverlay onLogout={handleLogout} />}
     </div>
   )
 }
