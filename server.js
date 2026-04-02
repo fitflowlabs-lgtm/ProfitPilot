@@ -308,20 +308,25 @@ app.post("/webhooks/app-uninstalled", async (req, res) => {
 app.get("/api/me", async (req, res) => {
   const shop = req.query.shop || req.session.shop;
   if (!shop) return res.json({ authenticated: false });
-  let store = await prisma.store.findUnique({ where: { shopDomain: shop } });
-  if (!store) return res.json({ authenticated: false, shop });
-  // Backfill shopName if missing
-  if (!store.shopName) {
-    try {
-      const shopRes = await fetch(`https://${shop}/admin/api/2024-01/shop.json`, { headers: { "X-Shopify-Access-Token": store.accessToken } });
-      const shopData = await shopRes.json();
-      if (shopData?.shop?.name) {
-        store = await prisma.store.update({ where: { id: store.id }, data: { shopName: shopData.shop.name } });
-      }
-    } catch (e) { console.error("shopName backfill failed:", e.message); }
+  try {
+    let store = await prisma.store.findUnique({ where: { shopDomain: shop } });
+    if (!store) return res.json({ authenticated: false, shop });
+    // Backfill shopName if missing
+    if (!store.shopName) {
+      try {
+        const shopRes = await fetch(`https://${shop}/admin/api/2024-01/shop.json`, { headers: { "X-Shopify-Access-Token": store.accessToken } });
+        const shopData = await shopRes.json();
+        if (shopData?.shop?.name) {
+          store = await prisma.store.update({ where: { id: store.id }, data: { shopName: shopData.shop.name } });
+        }
+      } catch (e) { console.error("shopName backfill failed:", e.message); }
+    }
+    req.session.shop = shop;
+    res.json({ authenticated: true, shop: store.shopDomain, shopName: store.shopName, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt });
+  } catch (e) {
+    console.error("/api/me error:", e.message);
+    res.status(500).json({ error: "Session check failed: " + e.message });
   }
-  req.session.shop = shop;
-  res.json({ authenticated: true, shop: store.shopDomain, shopName: store.shopName, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt });
 });
 
 app.post("/api/logout", (req, res) => { req.session.destroy(() => { res.json({ ok: true }); }); });
