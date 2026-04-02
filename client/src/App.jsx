@@ -9,15 +9,12 @@ import ProductsPage from './pages/ProductsPage'
 import RecommendationsPage from './pages/RecommendationsPage'
 import InventoryPage from './pages/InventoryPage'
 import DealsPage from './pages/DealsPage'
-import AIPage from './pages/AIPage'
-
 const PAGE_TITLES = {
   dashboard: 'Dashboard',
   products: 'Products & Costs',
   recommendations: 'Pricing & Margins',
   inventory: 'Inventory',
   deals: 'Deal Simulator',
-  ai: 'AI Insights',
 }
 
 export default function App() {
@@ -103,7 +100,6 @@ export default function App() {
       case 'recommendations': return <RecommendationsPage {...props} />
       case 'inventory': return <InventoryPage {...props} />
       case 'deals': return <DealsPage {...props} />
-      case 'ai': return <AIPage {...props} />
       default: return <DashboardPage {...props} onNavigate={setActivePage} />
     }
   }
