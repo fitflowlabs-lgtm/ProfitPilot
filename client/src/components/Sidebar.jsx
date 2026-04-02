@@ -26,9 +26,9 @@ export default function Sidebar({ activePage, onNavigate, shop, shopName, isOpen
 
   const handleConnectStore = (e) => {
     e.preventDefault()
-    let domain = newShop.trim().toLowerCase()
+    let domain = newShop.trim().toLowerCase().replace(/\.myshopify\.com.*$/, '')
     if (!domain) return
-    if (!domain.includes('.myshopify.com')) domain = `${domain}.myshopify.com`
+    domain = `${domain}.myshopify.com`
     setDropdownOpen(false)
     setConnecting(false)
     setNewShop('')
@@ -139,7 +139,7 @@ export default function Sidebar({ activePage, onNavigate, shop, shopName, isOpen
                     autoFocus
                     value={newShop}
                     onChange={(e) => setNewShop(e.target.value)}
-                    placeholder="yourstore.myshopify.com"
+                    placeholder="your-store-name"
                     style={{
                       background: 'var(--surface)', border: '1px solid var(--border)',
                       borderRadius: 6, padding: '6px 10px', color: 'var(--text-primary)',

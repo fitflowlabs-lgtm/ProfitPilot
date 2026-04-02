@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api'
 import { StatusBadge, MetricCard, Loading, AICard, AIButton, formatCurrency, formatPercent, marginColor } from '../components/UI'
+import Disclaimer from '../components/Disclaimer'
 
 export default function DashboardPage({ shop, refreshKey, onNavigate }) {
   const [data, setData] = useState(null)
@@ -410,6 +411,8 @@ export default function DashboardPage({ shop, refreshKey, onNavigate }) {
           </div>
         </>
       )}
+
+      <Disclaimer />
     </div>
   )
 }

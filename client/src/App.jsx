@@ -20,6 +20,59 @@ const PAGE_TITLES = {
   deals: 'Deal Simulator',
 }
 
+function HelpButton() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          position: 'fixed', bottom: 24, right: 24, zIndex: 998,
+          width: 44, height: 44, borderRadius: '50%',
+          background: 'var(--surface-raised)', border: '1px solid var(--border)',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-muted)',
+          transition: 'border-color 0.2s, color 0.2s',
+        }}
+        title="Help"
+      >
+        ?
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'fixed', bottom: 76, right: 24, zIndex: 998,
+          background: 'var(--surface-raised)', border: '1px solid var(--border)',
+          borderRadius: 12, padding: '20px 20px 16px',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)', width: 260,
+        }}>
+          <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>Need help?</div>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.6, margin: '0 0 14px' }}>
+            Reach out and we'll get back to you as soon as possible.
+          </p>
+          <a
+            href="mailto:fitflowlabs@gmail.com"
+            style={{
+              display: 'block', textAlign: 'center', padding: '8px 14px',
+              background: 'var(--accent)', color: '#fff', borderRadius: 8,
+              fontSize: '0.82rem', fontWeight: 600, textDecoration: 'none',
+            }}
+          >
+            fitflowlabs@gmail.com
+          </a>
+          <button
+            onClick={() => setOpen(false)}
+            style={{ marginTop: 10, width: '100%', background: 'none', border: 'none', fontSize: '0.78rem', color: 'var(--text-muted)', cursor: 'pointer' }}
+          >
+            Close
+          </button>
+        </div>
+      )}
+    </>
+  )
+}
+
 function PaywallOverlay({ onLogout }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -298,6 +351,7 @@ export default function App() {
       </main>
 
       {!isPaid && <PaywallOverlay onLogout={handleLogout} />}
+      <HelpButton />
     </div>
   )
 }
