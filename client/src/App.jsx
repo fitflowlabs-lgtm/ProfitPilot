@@ -351,6 +351,10 @@ export default function App() {
         }}>
           {renderPage()}
         </div>
+
+        <footer style={{ fontSize: '0.72rem', color: 'var(--text-muted)', padding: '16px 32px', borderTop: '1px solid var(--border-subtle)', textAlign: 'center', marginTop: 'auto' }}>
+          Margin Pilot provides pricing suggestions based on your data. Always review recommendations before applying changes to your store. This tool is for informational purposes and does not guarantee specific financial outcomes.
+        </footer>
       </main>
 
       {!isPaid && <PaywallOverlay onLogout={handleLogout} />}
