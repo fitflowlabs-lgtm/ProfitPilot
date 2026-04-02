@@ -357,7 +357,7 @@ app.post("/api/login", async (req, res) => {
     if (!user) return res.status(401).json({ error: "Invalid email or password" });
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return res.status(401).json({ error: "Invalid email or password" });
-    if (rememberMe) {
+    if (rememberMe && req.session.cookie) {
       req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
     }
     req.session.userId = user.id;
@@ -377,8 +377,12 @@ app.post("/api/login", async (req, res) => {
     }
     res.json({ authenticated: false, needsShopify: true });
   } catch (e) {
-    console.error("Login error:", e.message);
-    res.status(500).json({ error: "Login failed" });
+    console.error("Login error:", e.message, e.code || "", e.stack?.split("\n")[1] || "");
+    if (e.code === "P2021") {
+      // Prisma: table not found — User table wasn't migrated
+      return res.status(500).json({ error: "Database not set up yet. Please contact support." });
+    }
+    res.status(500).json({ error: "Login failed: " + e.message });
   }
 });
 
@@ -684,4 +688,19 @@ app.get(/^\/(?!api|auth|webhooks).*/, (req, res) => { res.sendFile(path.join(dis
 // Global error handler
 app.use((err, req, res, next) => { console.error("Unhandled:", err.message); res.status(500).json({ error: "Internal server error" }); });
 
-app.listen(PORT, () => { console.log(`Server running on port ${PORT} (${process.env.NODE_ENV || "development"})`); });
+app.listen(PORT, async () => {
+  console.log(`Server running on port ${PORT} (${process.env.NODE_ENV || "development"})`);
+  // Verify DB tables exist on startup so issues are immediately visible in logs
+  try {
+    await prisma.user.count();
+    console.log("DB check: User table OK");
+  } catch (e) {
+    console.error("DB check FAILED — User table missing. Run prisma db push.", e.message);
+  }
+  try {
+    await prisma.store.count();
+    console.log("DB check: Store table OK");
+  } catch (e) {
+    console.error("DB check FAILED — Store table missing.", e.message);
+  }
+});
