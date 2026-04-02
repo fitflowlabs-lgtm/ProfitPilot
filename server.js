@@ -341,6 +341,33 @@ app.get("/api/me", async (req, res) => {
 
 app.post("/api/logout", (req, res) => { req.session.destroy(() => { res.json({ ok: true }); }); });
 
+app.get("/api/stores", async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
+  try {
+    const stores = await prisma.store.findMany({
+      where: { userId: req.session.userId },
+      select: { shopDomain: true, shopName: true, lastProductsSyncAt: true },
+      orderBy: { createdAt: "asc" },
+    });
+    res.json({ stores });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/stores/switch", async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
+  const { shop } = req.body;
+  try {
+    const store = await prisma.store.findFirst({ where: { shopDomain: shop, userId: req.session.userId } });
+    if (!store) return res.status(403).json({ error: "Store not found or not yours" });
+    req.session.shop = shop;
+    res.json({ authenticated: true, shop: store.shopDomain, shopName: store.shopName, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt, plan: req.session.plan });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // -----------------------------
 // API: Auth (email/password)
 // -----------------------------

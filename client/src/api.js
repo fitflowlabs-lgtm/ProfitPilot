@@ -93,6 +93,10 @@ export const api = {
       body: JSON.stringify(params),
     }),
 
+  // Stores
+  stores: () => request("/stores"),
+  switchStore: (shop) => request("/stores/switch", { method: "POST", body: JSON.stringify({ shop }) }),
+
   // Stripe
   createCheckoutSession: () =>
     request("/stripe/create-checkout-session", { method: "POST", body: JSON.stringify({}) }),

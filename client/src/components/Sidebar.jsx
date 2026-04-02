@@ -1,4 +1,10 @@
-export default function Sidebar({ activePage, onNavigate, shop, shopName, isOpen }) {
+import { useState } from 'react'
+
+export default function Sidebar({ activePage, onNavigate, shop, shopName, isOpen, stores = [], onSwitchStore, onStoreConnected }) {
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [connecting, setConnecting] = useState(false)
+  const [newShop, setNewShop] = useState('')
+
   const displayName = shopName || (shop ? shop.replace('.myshopify.com', '').replace(/-/g, ' ') : 'Unknown')
   const initial = displayName.charAt(0).toUpperCase()
 
@@ -17,6 +23,19 @@ export default function Sidebar({ activePage, onNavigate, shop, shopName, isOpen
       { id: 'deals', label: 'Deal Simulator', icon: <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg> },
     ]},
   ]
+
+  const handleConnectStore = (e) => {
+    e.preventDefault()
+    let domain = newShop.trim().toLowerCase()
+    if (!domain) return
+    if (!domain.includes('.myshopify.com')) domain = `${domain}.myshopify.com`
+    setDropdownOpen(false)
+    setConnecting(false)
+    setNewShop('')
+    window.location.href = `/auth?shop=${encodeURIComponent(domain)}`
+  }
+
+  const otherStores = stores.filter((s) => s.shopDomain !== shop)
 
   return (
     <aside className={`sidebar${isOpen ? ' open' : ''}`}>
@@ -44,11 +63,98 @@ export default function Sidebar({ activePage, onNavigate, shop, shopName, isOpen
       </nav>
 
       <div className="sidebar-footer">
-        <div className="store-badge">
-          <div className="store-avatar">{initial}</div>
-          <div className="store-info">
-            <div className="store-name">{displayName}</div>
-          </div>
+        {/* Store switcher */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => { setDropdownOpen((o) => !o); setConnecting(false) }}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+              background: dropdownOpen ? 'var(--surface-raised)' : 'transparent',
+              border: '1px solid var(--border)', borderRadius: 8,
+              padding: '8px 10px', cursor: 'pointer', textAlign: 'left',
+            }}
+          >
+            <div className="store-avatar" style={{ flexShrink: 0 }}>{initial}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="store-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</div>
+              {stores.length > 1 && (
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{stores.length} stores</div>
+              )}
+            </div>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, color: 'var(--text-muted)', transform: dropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+              <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+
+          {dropdownOpen && (
+            <div style={{
+              position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, right: 0,
+              background: 'var(--surface-raised)', border: '1px solid var(--border)',
+              borderRadius: 10, overflow: 'hidden',
+              boxShadow: '0 -8px 24px rgba(0,0,0,0.4)', zIndex: 100,
+            }}>
+              {/* Active store */}
+              <div style={{ padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: otherStores.length > 0 || true ? '1px solid var(--border)' : 'none' }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />
+                <span style={{ fontSize: '0.82rem', color: 'var(--text-primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</span>
+              </div>
+
+              {/* Other stores */}
+              {otherStores.map((s) => {
+                const name = s.shopName || s.shopDomain.replace('.myshopify.com', '').replace(/-/g, ' ')
+                return (
+                  <button
+                    key={s.shopDomain}
+                    onClick={() => { onSwitchStore(s.shopDomain); setDropdownOpen(false) }}
+                    style={{
+                      width: '100%', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8,
+                      background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
+                      borderBottom: '1px solid var(--border)',
+                    }}
+                  >
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--border)', flexShrink: 0 }} />
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                  </button>
+                )
+              })}
+
+              {/* Connect new store */}
+              {!connecting ? (
+                <button
+                  onClick={() => setConnecting(true)}
+                  style={{
+                    width: '100%', padding: '9px 12px', display: 'flex', alignItems: 'center', gap: 8,
+                    background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left',
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                    <circle cx="6.5" cy="6.5" r="6" stroke="var(--accent)" strokeWidth="1.2"/>
+                    <path d="M6.5 4v5M4 6.5h5" stroke="var(--accent)" strokeWidth="1.2" strokeLinecap="round"/>
+                  </svg>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--accent)', fontWeight: 600 }}>Connect new store</span>
+                </button>
+              ) : (
+                <form onSubmit={handleConnectStore} style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <input
+                    autoFocus
+                    value={newShop}
+                    onChange={(e) => setNewShop(e.target.value)}
+                    placeholder="yourstore.myshopify.com"
+                    style={{
+                      background: 'var(--surface)', border: '1px solid var(--border)',
+                      borderRadius: 6, padding: '6px 10px', color: 'var(--text-primary)',
+                      fontSize: '0.8rem', fontFamily: 'var(--font-body)', width: '100%',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button type="submit" className="btn btn-primary" style={{ flex: 1, padding: '5px', fontSize: '0.78rem' }}>Connect</button>
+                    <button type="button" className="btn btn-ghost" style={{ flex: 1, padding: '5px', fontSize: '0.78rem' }} onClick={() => { setConnecting(false); setNewShop('') }}>Cancel</button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </aside>

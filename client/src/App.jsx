@@ -127,9 +127,14 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [stores, setStores] = useState([])
 
   const [storeError, setStoreError] = useState(null)
   const [storeErrorShop, setStoreErrorShop] = useState(null)
+
+  const fetchStores = () => {
+    api.stores().then((r) => setStores(r?.stores || [])).catch(() => {})
+  }
 
   useEffect(() => {
     if (window.location.pathname === '/payment/success') {
@@ -155,6 +160,7 @@ export default function App() {
         if (data?.authenticated) {
           setAuth(data)
           if (shop) window.history.replaceState({}, '', '/')
+          fetchStores()
         } else {
           setAuth(false)
         }
@@ -165,6 +171,17 @@ export default function App() {
   const handleLogout = async () => {
     await api.logout()
     setAuth(false)
+  }
+
+  const handleSwitchStore = async (shop) => {
+    try {
+      const data = await api.switchStore(shop)
+      setAuth((prev) => ({ ...prev, ...data }))
+      setRefreshKey((k) => k + 1)
+      setActivePage('dashboard')
+    } catch (e) {
+      console.error('Switch store failed:', e.message)
+    }
   }
 
   const handleSync = useCallback(async () => {
@@ -187,8 +204,7 @@ export default function App() {
         onContinue={() => {
           window.history.replaceState({}, '', '/')
           setActivePage('dashboard')
-          // Refresh auth to pick up new plan
-          api.me().then((data) => { if (data?.authenticated) setAuth(data) })
+          api.me().then((data) => { if (data?.authenticated) { setAuth(data); fetchStores() } })
         }}
       />
     )
@@ -257,6 +273,9 @@ export default function App() {
         shop={auth.shop}
         shopName={auth.shopName}
         isOpen={sidebarOpen}
+        stores={stores}
+        onSwitchStore={handleSwitchStore}
+        onStoreConnected={fetchStores}
       />
 
       <main className="main-content">
