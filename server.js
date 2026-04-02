@@ -325,9 +325,23 @@ app.post("/api/login", async (req, res) => {
 // -----------------------------
 // API: Sync
 // -----------------------------
-app.post("/api/sync/products", requireStore, async (req, res) => { try { await syncProductsForStore(req.store); const s = await prisma.store.findUnique({ where: { id: req.store.id } }); res.json({ ok: true, lastProductsSyncAt: s.lastProductsSyncAt }); } catch (e) { const h = handleShopifyError(e, res, req.store.shopDomain); if (h) return; res.status(500).json({ error: e.message }); } });
-app.post("/api/sync/orders", requireStore, async (req, res) => { try { await syncOrdersForStore(req.store); const s = await prisma.store.findUnique({ where: { id: req.store.id } }); res.json({ ok: true, lastOrdersSyncAt: s.lastOrdersSyncAt }); } catch (e) { const h = handleShopifyError(e, res, req.store.shopDomain); if (h) return; res.status(500).json({ error: e.message }); } });
-app.post("/api/sync/all", requireStore, async (req, res) => { try { const s = await autoSyncIfNeeded(req.store); res.json({ ok: true, lastProductsSyncAt: s.lastProductsSyncAt, lastOrdersSyncAt: s.lastOrdersSyncAt }); } catch (e) { const h = handleShopifyError(e, res, req.store.shopDomain); if (h) return; res.status(500).json({ error: e.message }); } });
+app.post("/api/sync/products", requireStore, async (req, res) => { try { await syncProductsForStore(req.store); const s = await prisma.store.findUnique({ where: { id: req.store.id } }); res.json({ ok: true, lastProductsSyncAt: s.lastProductsSyncAt }); } catch (e) { console.error("Sync products error:", e.message); const h = handleShopifyError(e, res, req.store.shopDomain); if (h) return; res.status(500).json({ error: e.message }); } });
+app.post("/api/sync/orders", requireStore, async (req, res) => { try { await syncOrdersForStore(req.store); const s = await prisma.store.findUnique({ where: { id: req.store.id } }); res.json({ ok: true, lastOrdersSyncAt: s.lastOrdersSyncAt }); } catch (e) { console.error("Sync orders error:", e.message); const h = handleShopifyError(e, res, req.store.shopDomain); if (h) return; res.status(500).json({ error: e.message }); } });
+app.post("/api/sync/all", requireStore, async (req, res) => {
+  try {
+    console.log(`Manual sync triggered for shop: ${req.store.shopDomain}`);
+    await syncProductsForStore(req.store);
+    await syncOrdersForStore(req.store);
+    const s = await prisma.store.findUnique({ where: { id: req.store.id } });
+    console.log(`Sync complete for shop: ${req.store.shopDomain}`);
+    res.json({ ok: true, lastProductsSyncAt: s.lastProductsSyncAt, lastOrdersSyncAt: s.lastOrdersSyncAt });
+  } catch (e) {
+    console.error(`Sync/all error for ${req.store?.shopDomain}:`, e.message);
+    const h = handleShopifyError(e, res, req.store.shopDomain);
+    if (h) return;
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // -----------------------------
 // API: Dashboard
