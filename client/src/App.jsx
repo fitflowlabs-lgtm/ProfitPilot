@@ -323,6 +323,10 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <div
+        className={`sidebar-overlay${sidebarOpen ? ' visible' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      />
       <Sidebar
         activePage={activePage}
         onNavigate={setActivePage}

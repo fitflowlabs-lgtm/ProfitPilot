@@ -7,10 +7,8 @@ export default function Header({ title, syncing, lastSync, onSync, onLogout, onT
     <header className="header-bar">
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <button
-          className="btn btn-ghost btn-sm"
+          className="btn btn-ghost btn-sm hamburger-btn"
           onClick={onToggleSidebar}
-          style={{ display: 'none' }}
-          // Show via CSS media query on mobile — or keep simple
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
