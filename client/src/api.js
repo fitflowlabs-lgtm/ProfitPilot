@@ -106,6 +106,10 @@ export const api = {
   createCheckoutSession: () =>
     request("/stripe/create-checkout-session", { method: "POST", body: JSON.stringify({}) }),
   getSubscription: () => request("/stripe/subscription"),
+  getBillingPortal: () => request("/stripe/portal", { method: "POST" }),
+
+  // Profile
+  profile: () => request("/me/profile"),
 
   // AI
   aiSummary: (shop) =>

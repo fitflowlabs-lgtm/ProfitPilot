@@ -786,6 +786,33 @@ app.get("/api/stripe/subscription", async (req, res) => {
   }
 });
 
+app.post("/api/stripe/portal", async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.session.userId }, select: { stripeCustomerId: true } });
+    if (!user?.stripeCustomerId) return res.status(400).json({ error: "No billing account found." });
+    const session = await stripe.billingPortal.sessions.create({
+      customer: user.stripeCustomerId,
+      return_url: process.env.CLIENT_URL,
+    });
+    res.json({ url: session.url });
+  } catch (e) {
+    console.error("Stripe portal error:", e.message);
+    res.status(500).json({ error: e.message || "Failed to open billing portal" });
+  }
+});
+
+app.get("/api/me/profile", async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.session.userId }, select: { name: true, email: true, plan: true } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json(user);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post("/api/webhooks/stripe", async (req, res) => {
   const sig = req.headers["stripe-signature"];
   let event;

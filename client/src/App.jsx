@@ -11,6 +11,7 @@ import RecommendationsPage from './pages/RecommendationsPage'
 import InventoryPage from './pages/InventoryPage'
 import DealsPage from './pages/DealsPage'
 import PaymentSuccessPage from './pages/PaymentSuccessPage'
+import SettingsPage from './pages/SettingsPage'
 
 const PAGE_TITLES = {
   dashboard: 'Dashboard',
@@ -18,6 +19,7 @@ const PAGE_TITLES = {
   recommendations: 'Pricing & Margins',
   inventory: 'Inventory',
   deals: 'Deal Simulator',
+  settings: 'Settings',
 }
 
 function HelpButton() {
@@ -314,6 +316,7 @@ export default function App() {
       case 'recommendations': return <RecommendationsPage {...props} />
       case 'inventory': return <InventoryPage {...props} />
       case 'deals': return <DealsPage {...props} />
+      case 'settings': return <SettingsPage stores={stores} onNavigate={setActivePage} />
       default: return <DashboardPage {...props} onNavigate={setActivePage} />
     }
   }
