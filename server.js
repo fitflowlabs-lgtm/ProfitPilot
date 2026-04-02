@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
+const bcrypt = require("bcryptjs");
 const OpenAI = require("openai");
 const prisma = require("./src/db");
 const session = require("express-session");
@@ -215,7 +216,8 @@ app.get("/auth/callback", async (req, res) => {
     const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ client_id: process.env.SHOPIFY_API_KEY, client_secret: process.env.SHOPIFY_API_SECRET, code }) });
     const tokenData = await tokenRes.json();
     if (!tokenRes.ok || !tokenData.access_token) return res.status(400).json({ error: "OAuth failed", details: tokenData });
-    await prisma.store.upsert({ where: { shopDomain: shop }, update: { accessToken: tokenData.access_token }, create: { shopDomain: shop, accessToken: tokenData.access_token } });
+    const userId = req.session.userId || null;
+    await prisma.store.upsert({ where: { shopDomain: shop }, update: { accessToken: tokenData.access_token, ...(userId ? { userId } : {}) }, create: { shopDomain: shop, accessToken: tokenData.access_token, ...(userId ? { userId } : {}) } });
     req.session.shop = shop;
     try { await registerWebhooks(shop, tokenData.access_token); } catch (e) { console.error("Webhook registration failed:", e.message); }
     res.redirect(`${process.env.CLIENT_URL || "http://localhost:5173"}/?shop=${encodeURIComponent(shop)}`);
@@ -266,6 +268,50 @@ app.get("/api/me", async (req, res) => {
 });
 
 app.post("/api/logout", (req, res) => { req.session.destroy(() => { res.json({ ok: true }); }); });
+
+// -----------------------------
+// API: Auth (email/password)
+// -----------------------------
+app.post("/api/register", async (req, res) => {
+  const { name, email, password } = req.body || {};
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: "Name, email, and password are required" });
+  }
+  try {
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) return res.status(400).json({ error: "An account with this email already exists" });
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await prisma.user.create({ data: { name, email, passwordHash } });
+    req.session.userId = user.id;
+    res.json({ ok: true, userId: user.id, name: user.name, email: user.email });
+  } catch (e) {
+    console.error("Register error:", e.message);
+    res.status(500).json({ error: "Failed to create account" });
+  }
+});
+
+app.post("/api/login", async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email and password are required" });
+  }
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(401).json({ error: "Invalid email or password" });
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) return res.status(401).json({ error: "Invalid email or password" });
+    req.session.userId = user.id;
+    const store = await prisma.store.findFirst({ where: { userId: user.id } });
+    if (store) {
+      req.session.shop = store.shopDomain;
+      return res.json({ authenticated: true, shop: store.shopDomain, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt });
+    }
+    res.json({ authenticated: false, needsShopify: true });
+  } catch (e) {
+    console.error("Login error:", e.message);
+    res.status(500).json({ error: "Login failed" });
+  }
+});
 
 // -----------------------------
 // API: Sync

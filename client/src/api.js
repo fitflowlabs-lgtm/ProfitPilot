@@ -1,4 +1,4 @@
-const API_BASE = "https://marginpilot.co/api";
+const API_BASE = "/api";
 
 async function request(path, options = {}) {
   const url = `${API_BASE}${path}`;
@@ -34,6 +34,9 @@ export const api = {
   // Session
   me: (shop) => request(`/me${shop ? `?shop=${encodeURIComponent(shop)}` : ""}`),
   logout: () => request("/logout", { method: "POST" }),
+// Auth
+  login: (body) => request("/login", { method: "POST", body: JSON.stringify(body) }),
+  register: (body) => request("/register", { method: "POST", body: JSON.stringify(body) }),
 
   // Sync
   syncAll: (shop) =>
