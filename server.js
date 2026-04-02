@@ -636,7 +636,18 @@ app.post("/api/deals/simulate", requireStore, async (req, res) => {
 // -----------------------------
 const aiRL = rateLimit("ai", 20, 60000);
 
-app.post("/api/ai/summary", requireStore, aiRL, async (req, res) => {
+async function requirePaid(req, res, next) {
+  if (!req.session.userId) return res.status(403).json({ error: "Subscription required." });
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.session.userId }, select: { plan: true } });
+    if (!user || user.plan === "free") return res.status(403).json({ error: "Subscription required." });
+    next();
+  } catch (e) {
+    res.status(500).json({ error: "Could not verify plan." });
+  }
+}
+
+app.post("/api/ai/summary", requireStore, requirePaid, aiRL, async (req, res) => {
   try {
     const variants = await prisma.variant.findMany({ where: { storeId: req.store.id }, include: { product: true } });
     if (!variants.length) return res.json({ analysis: "No products synced yet." });
@@ -647,7 +658,7 @@ app.post("/api/ai/summary", requireStore, aiRL, async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post("/api/ai/product/:variantId", requireStore, aiRL, async (req, res) => {
+app.post("/api/ai/product/:variantId", requireStore, requirePaid, aiRL, async (req, res) => {
   try {
     const v = await prisma.variant.findUnique({ where:{id:req.params.variantId}, include:{product:true} });
     if (!v||v.storeId!==req.store.id) return res.status(404).json({error:"Variant not found"});
@@ -664,7 +675,7 @@ app.post("/api/ai/product/:variantId", requireStore, aiRL, async (req, res) => {
   } catch (e) { res.status(500).json({error:e.message}); }
 });
 
-app.post("/api/ai/inventory/:variantId", requireStore, aiRL, async (req, res) => {
+app.post("/api/ai/inventory/:variantId", requireStore, requirePaid, aiRL, async (req, res) => {
   try {
     const v = await prisma.variant.findUnique({ where:{id:req.params.variantId}, include:{product:true,orderItems:{include:{order:true}}} });
     if (!v||v.storeId!==req.store.id) return res.status(404).json({error:"Variant not found"});
@@ -675,7 +686,7 @@ app.post("/api/ai/inventory/:variantId", requireStore, aiRL, async (req, res) =>
   } catch (e) { res.status(500).json({error:e.message}); }
 });
 
-app.post("/api/ai/deal", requireStore, aiRL, async (req, res) => {
+app.post("/api/ai/deal", requireStore, requirePaid, aiRL, async (req, res) => {
   try {
     const { simulationData } = req.body;
     const c = await openai.chat.completions.create({ model:"gpt-4.1-mini", messages:[{role:"system",content:"You are an expert ecommerce promotion strategist. When asked to predict sales lift, include a specific percentage estimate in format 'X%'."},{role:"user",content:`Analyze: 1) Should all go on sale? 2) Exclude which? 3) Strongest? 4) Too broad? 5) Better deal? 6) Predict sales lift %. Be concise.\n\n${JSON.stringify(simulationData,null,2)}`}], temperature:0.7 });
