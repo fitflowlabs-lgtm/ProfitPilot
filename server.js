@@ -1,5 +1,24 @@
 require("dotenv").config();
 
+// Validate required environment variables before anything else
+const REQUIRED_ENV = [
+  "SESSION_SECRET",
+  "SHOPIFY_API_KEY",
+  "SHOPIFY_API_SECRET",
+  "DATABASE_URL",
+  "STRIPE_SECRET_KEY",
+  "STRIPE_PRICE_ID",
+  "STRIPE_WEBHOOK_SECRET",
+  "OPENAI_API_KEY",
+];
+const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
+if (missing.length > 0) {
+  console.error("❌ Missing required environment variables:", missing.join(", "));
+  process.exit(1);
+}
+process.env.APP_URL = process.env.APP_URL || "http://localhost:3000";
+process.env.CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
+
 const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
