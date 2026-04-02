@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import LoginPage from './pages/LoginPage'
 import OnboardingFlow from "./pages/OnboardingFlow"
+import StoreErrorPage from './pages/StoreErrorPage'
 import DashboardPage from './pages/DashboardPage'
 import ProductsPage from './pages/ProductsPage'
 import RecommendationsPage from './pages/RecommendationsPage'
@@ -26,9 +27,21 @@ export default function App() {
   const [syncing, setSyncing] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
+  const [storeError, setStoreError] = useState(null)
+  const [storeErrorShop, setStoreErrorShop] = useState(null)
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const shop = params.get('shop')
+    const storeErr = params.get('store_error')
+
+    if (storeErr) {
+      setStoreErrorShop(params.get('shop') || null)
+      setStoreError(storeErr)
+      window.history.replaceState({}, '', '/')
+      setAuth(false)
+      return
+    }
 
     api.me(shop)
       .then((data) => {
@@ -71,6 +84,17 @@ export default function App() {
 
   // 🔐 AUTH FLOW
   if (auth === false) {
+    if (storeError) {
+      return (
+        <StoreErrorPage
+          errorCode={storeError}
+          shop={storeErrorShop}
+          onConnect={() => { setStoreError(null); setOnboardingStep('connect'); setAuthMode('onboarding') }}
+          onLogin={() => { setStoreError(null); setAuthMode('login') }}
+        />
+      )
+    }
+
     if (authMode === 'login') {
       return (
         <LoginPage

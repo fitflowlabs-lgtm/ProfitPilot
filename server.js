@@ -201,10 +201,12 @@ function getSeasonalMultiplier(title) {
 // -----------------------------
 setInterval(async () => { try { await prisma.oAuthState.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 10 * 60 * 1000) } } }); } catch {} }, 5 * 60 * 1000);
 
+const CLIENT = process.env.CLIENT_URL || "http://localhost:5173";
+
 app.get("/auth", async (req, res) => {
   const shop = req.query.shop;
-  if (!shop) return res.status(400).send("Missing shop");
-  if (!isValidShopDomain(shop)) return res.status(400).send("Invalid shop domain");
+  if (!shop) return res.redirect(`${CLIENT}/?store_error=missing_shop`);
+  if (!isValidShopDomain(shop)) return res.redirect(`${CLIENT}/?store_error=invalid_domain&shop=${encodeURIComponent(shop)}`);
   const state = crypto.randomBytes(16).toString("hex");
   await prisma.oAuthState.create({ data: { state, shop } });
   const redirectUri = `${process.env.APP_URL}/auth/callback`;
@@ -213,11 +215,11 @@ app.get("/auth", async (req, res) => {
 
 app.get("/auth/callback", async (req, res) => {
   const { shop, code, state } = req.query;
-  if (!shop || !code || !state) return res.status(400).send("Missing shop, code, or state");
-  if (!isValidShopDomain(shop)) return res.status(400).send("Invalid shop domain");
-  if (!verifyOAuthHmac(req.query)) { console.error("HMAC verification failed:", shop); return res.status(400).send("HMAC verification failed"); }
+  if (!shop || !code || !state) return res.redirect(`${CLIENT}/?store_error=missing_params`);
+  if (!isValidShopDomain(shop)) return res.redirect(`${CLIENT}/?store_error=invalid_domain&shop=${encodeURIComponent(shop)}`);
+  if (!verifyOAuthHmac(req.query)) { console.error("HMAC verification failed:", shop); return res.redirect(`${CLIENT}/?store_error=auth_failed`); }
   const pending = await prisma.oAuthState.findUnique({ where: { state } });
-  if (!pending) return res.status(400).send("Invalid OAuth state");
+  if (!pending) return res.redirect(`${CLIENT}/?store_error=expired`);
   await prisma.oAuthState.delete({ where: { state } });
   try {
     const tokenRes = await fetch(`https://${shop}/admin/oauth/access_token`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ client_id: process.env.SHOPIFY_API_KEY, client_secret: process.env.SHOPIFY_API_SECRET, code }) });
