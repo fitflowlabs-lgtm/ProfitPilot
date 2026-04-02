@@ -164,54 +164,50 @@ export default function DashboardPage({ shop, refreshKey, onNavigate }) {
                   </p>
                 </div>
               )}
+
+              {/* Alerts table — sits under the insight cards in the right column */}
+              {alerts.length > 0 && (
+                <div className="panel" style={{ marginTop: 4 }}>
+                  <div className="panel-header">
+                    <span className="panel-title">⚠ Action Required</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{alerts.length} items</span>
+                  </div>
+                  <div className="panel-body flush">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Product</th>
+                          <th className="text-right">Margin</th>
+                          <th>Status</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {alerts.map((item) => (
+                          <tr key={item.id}>
+                            <td>
+                              <span className="product-name">{item.productTitle}</span>
+                              <br /><span className="variant-name">{item.sku}</span>
+                            </td>
+                            <td className="text-right mono" style={{ color: marginColor(item.marginPercent) }}>
+                              {formatPercent(item.marginPercent)}
+                            </td>
+                            <td><StatusBadge status={item.status} /></td>
+                            <td>
+                              {item.status === 'missing_cost'
+                                ? <button className="btn btn-sm btn-ghost" onClick={() => onNavigate('products')}>Add Cost</button>
+                                : <button className="btn btn-sm btn-primary" onClick={() => onNavigate('recommendations')}>Reprice</button>
+                              }
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-
-          {/* Alerts table */}
-          {alerts.length > 0 && (
-            <div className="panel animate-in delay-2">
-              <div className="panel-header">
-                <span className="panel-title">⚠ Action Required</span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{alerts.length} items</span>
-              </div>
-              <div className="panel-body flush">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Product</th>
-                      <th className="text-right">Price</th>
-                      <th className="text-right">Cost</th>
-                      <th className="text-right">Margin</th>
-                      <th>Status</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {alerts.map((item) => (
-                      <tr key={item.id}>
-                        <td>
-                          <span className="product-name">{item.productTitle}</span>
-                          <br /><span className="variant-name">{item.sku}</span>
-                        </td>
-                        <td className="text-right mono">{formatCurrency(item.price)}</td>
-                        <td className="text-right mono">{formatCurrency(item.cost)}</td>
-                        <td className="text-right mono" style={{ color: marginColor(item.marginPercent) }}>
-                          {formatPercent(item.marginPercent)}
-                        </td>
-                        <td><StatusBadge status={item.status} /></td>
-                        <td>
-                          {item.status === 'missing_cost'
-                            ? <button className="btn btn-sm btn-ghost" onClick={() => onNavigate('products')}>Add Cost</button>
-                            : <button className="btn btn-sm btn-primary" onClick={() => onNavigate('recommendations')}>Reprice</button>
-                          }
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
         </>
       )}
 
