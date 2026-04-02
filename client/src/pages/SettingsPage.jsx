@@ -94,7 +94,7 @@ export default function SettingsPage({ stores = [], onNavigate }) {
 
         {isPro ? (
           <button
-            className="btn btn-secondary"
+            className="btn btn-ghost"
             onClick={handleManageSubscription}
             disabled={portalLoading}
             style={{ opacity: portalLoading ? 0.7 : 1 }}
