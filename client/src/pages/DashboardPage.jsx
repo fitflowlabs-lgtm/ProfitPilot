@@ -125,6 +125,23 @@ export default function DashboardPage({ shop, refreshKey, onNavigate }) {
             </div>
 
             <div style={{ flex: '1 1 45%', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {losingProducts.length === 0 && missingCostProducts.length === 0 && lowProducts.length === 0 && alerts.length === 0 && (
+                <div style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  padding: '32px 20px', background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderRadius: 12, textAlign: 'center', gap: 10,
+                }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(34,197,94,0.12)', border: '1.5px solid rgba(34,197,94,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                      <path d="M5 13l4 4L19 7" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>All clear</div>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}>
+                    No issues detected. Your store margins look healthy.
+                  </p>
+                </div>
+              )}
               {losingProducts.length > 0 && (
                 <div className="ai-insight-item">
                   <span className="ai-insight-tag risk">Risk</span>
