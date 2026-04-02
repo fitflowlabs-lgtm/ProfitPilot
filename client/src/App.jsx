@@ -26,51 +26,55 @@ function HelpButton() {
   const [open, setOpen] = useState(false)
   return (
     <>
+      {open && (
+        <div style={{
+          position: 'fixed', bottom: 80, right: 24, zIndex: 90,
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 12, padding: 16, width: 248,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+        }}>
+          <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
+            Need help?
+          </div>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.6, margin: '0 0 12px' }}>
+            Email us and we'll get back to you as soon as possible.
+          </p>
+          <a
+            href="mailto:support@marginpilot.co"
+            className="btn btn-primary"
+            style={{ display: 'block', textAlign: 'center', textDecoration: 'none', fontSize: '0.8rem' }}
+          >
+            support@marginpilot.co
+          </a>
+          {/* Arrow pointing down */}
+          <div style={{
+            position: 'absolute', bottom: -7, right: 18,
+            width: 13, height: 13,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderTop: 'none', borderLeft: 'none',
+            transform: 'rotate(45deg)',
+          }} />
+        </div>
+      )}
+
       <button
         onClick={() => setOpen((o) => !o)}
         style={{
-          position: 'fixed', bottom: 24, right: 24, zIndex: 998,
+          position: 'fixed', bottom: 24, right: 24, zIndex: 90,
           width: 44, height: 44, borderRadius: '50%',
-          background: 'var(--surface-raised)', border: '1px solid var(--border)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+          background: 'var(--accent)', border: 'none',
+          boxShadow: '0 4px 16px rgba(59,130,246,0.4)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-muted)',
-          transition: 'border-color 0.2s, color 0.2s',
+          cursor: 'pointer',
         }}
         title="Help"
       >
-        ?
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
       </button>
-
-      {open && (
-        <div style={{
-          position: 'fixed', bottom: 76, right: 24, zIndex: 998,
-          background: 'var(--surface-raised)', border: '1px solid var(--border)',
-          borderRadius: 12, padding: '20px 20px 16px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.5)', width: 260,
-        }}>
-          <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>Need help?</div>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', lineHeight: 1.6, margin: '0 0 14px' }}>
-            Reach out and we'll get back to you as soon as possible.
-          </p>
-          <a
-            href="mailto:fitflowlabs@gmail.com"
-            style={{
-              display: 'block', textAlign: 'center', padding: '8px 14px',
-              background: 'var(--accent)', color: '#fff', borderRadius: 8,
-              fontSize: '0.82rem', fontWeight: 600, textDecoration: 'none',
-            }}
-          >
-            fitflowlabs@gmail.com
-          </a>
-          <button
-            onClick={() => setOpen(false)}
-            style={{ marginTop: 10, width: '100%', background: 'none', border: 'none', fontSize: '0.78rem', color: 'var(--text-muted)', cursor: 'pointer' }}
-          >
-            Close
-          </button>
-        </div>
-      )}
     </>
   )
 }
