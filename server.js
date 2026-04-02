@@ -301,7 +301,16 @@ app.post("/api/login", async (req, res) => {
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return res.status(401).json({ error: "Invalid email or password" });
     req.session.userId = user.id;
-    const store = await prisma.store.findFirst({ where: { userId: user.id } });
+    // First try to find a store already linked to this user
+    let store = await prisma.store.findFirst({ where: { userId: user.id } });
+    // Fallback: if no linked store, grab any unlinked store and claim it
+    // (happens when OAuth ran before the user account was linked)
+    if (!store) {
+      store = await prisma.store.findFirst({ where: { userId: null } });
+      if (store) {
+        await prisma.store.update({ where: { id: store.id }, data: { userId: user.id } });
+      }
+    }
     if (store) {
       req.session.shop = store.shopDomain;
       return res.json({ authenticated: true, shop: store.shopDomain, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt });
