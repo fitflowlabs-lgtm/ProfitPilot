@@ -6,7 +6,7 @@ const IMAP_CONFIG = {
   imap: {
     user: process.env.ZOHO_EMAIL,
     password: process.env.ZOHO_PASSWORD,
-    host: "imaps.zoho.com",
+    host: "imap.zoho.com",
     port: 993,
     tls: true,
     tlsOptions: { rejectUnauthorized: false },
