@@ -50,4 +50,4 @@ async function createSupportTicket({ from_email, from_name, subject, text }) {
   });
 }
 
-module.exports = { createSupportTicket };
+module.exports = { createSupportTicket, createTicketWithAIDraft: createSupportTicket };

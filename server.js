@@ -12,8 +12,6 @@ const REQUIRED_ENV = [
   "OPENAI_API_KEY",
   "ZOHO_EMAIL",
   "ZOHO_PASSWORD",
-  "ZOHO_ACCOUNT_ID",
-  "ZOHO_MAIL_TOKEN",
 ];
 const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
 if (missing.length > 0) {
@@ -74,7 +72,7 @@ const PORT = process.env.PORT || 3000;
 const { verifyConnection } = require("./src/mailer");
 const supportRouter = require("./src/routes/support");
 const { createSupportTicket } = require("./src/supportHelper");
-const { startPoller } = require("./src/zohoMailPoller");
+const { startPoller } = require("./src/emailPoller");
 
 // -----------------------------
 // Rate Limiter (in-memory)
