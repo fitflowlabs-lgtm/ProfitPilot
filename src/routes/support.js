@@ -12,8 +12,8 @@ function requireAuth(req, res, next) {
   next();
 }
 
-// GET / — list tickets with optional ?status= filter
-router.get("/", requireAuth, async (req, res) => {
+// GET /tickets — list tickets with optional ?status= filter
+router.get("/tickets", requireAuth, async (req, res) => {
   try {
     const where = req.query.status ? { status: req.query.status } : {};
     const tickets = await prisma.supportTicket.findMany({
