@@ -73,4 +73,4 @@ function startPoller(intervalMs = 5 * 60 * 1000) {
   return setInterval(pollInbox, intervalMs);
 }
 
-module.exports = { startPoller };
+module.exports = { startPoller, pollInbox };

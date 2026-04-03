@@ -2,6 +2,7 @@ const { Router } = require("express");
 const prisma = require("../db");
 const OpenAI = require("openai");
 const { sendReply } = require("../mailer");
+const { pollInbox } = require("../emailPoller");
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const router = Router();
@@ -132,6 +133,16 @@ router.post("/:id/regenerate", requireAuth, async (req, res) => {
       data: { aiDraft },
     });
     res.json({ ticket: updated });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /poll — manually trigger inbox check (admin only)
+router.post("/poll", requireAuth, async (req, res) => {
+  try {
+    await pollInbox();
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

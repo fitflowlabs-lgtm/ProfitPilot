@@ -221,7 +221,7 @@ export default function App() {
         if (data?.authenticated) {
           setAuth(data)
           if (shop) window.history.replaceState({}, '', '/')
-          fetchStores()
+          if (!data.needsStore) fetchStores()
         } else {
           setAuth(false)
         }
@@ -308,6 +308,23 @@ export default function App() {
         initialStep={onboardingStep}
         onSwitch={() => setAuthMode('login')}
         onComplete={(user) => setAuth(user)}
+      />
+    )
+  }
+
+  // Logged in but no store connected yet — show connect step
+  if (auth.needsStore) {
+    return (
+      <OnboardingFlow
+        initialStep="connect"
+        onSwitch={handleLogout}
+        onComplete={() => {
+          // After skipping/connecting, re-check session
+          api.me().then((data) => {
+            if (data?.authenticated) { setAuth(data); if (!data.needsStore) fetchStores() }
+            else setAuth(false)
+          })
+        }}
       />
     )
   }

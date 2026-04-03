@@ -45,6 +45,8 @@ export default function SupportPage({ isAdmin }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [polling, setPolling] = useState(false)
+  const [pollMsg, setPollMsg] = useState('')
   const [expandedId, setExpandedId] = useState(null)
   const [drafts, setDrafts] = useState({})
   const [actionMsg, setActionMsg] = useState({}) // { [id]: { text, isError } }
@@ -165,17 +167,47 @@ export default function SupportPage({ isAdmin }) {
     }
   }
 
+  const handlePoll = async () => {
+    setPolling(true)
+    setPollMsg('')
+    try {
+      const res = await fetch(`${API}/poll`, { method: 'POST', credentials: 'include' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Poll failed')
+      setPollMsg('Inbox checked.')
+      await fetchTickets()
+    } catch (e) {
+      setPollMsg(e.message)
+    } finally {
+      setPolling(false)
+      setTimeout(() => setPollMsg(''), 4000)
+    }
+  }
+
   const filterTabs = ['all', 'open', 'sent', 'dismissed']
 
   return (
     <div style={{ padding: '24px 32px', maxWidth: 1100 }}>
-      <div style={{ marginBottom: 24 }}>
-        <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-          Support Tickets
-        </h2>
-        <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-          Review and send AI-drafted replies to support emails.
-        </p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+            Support Tickets
+          </h2>
+          <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+            Review and send AI-drafted replies to support emails.
+          </p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {pollMsg && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{pollMsg}</span>}
+          <button
+            className="btn btn-ghost"
+            onClick={handlePoll}
+            disabled={polling}
+            style={{ fontSize: '0.82rem', opacity: polling ? 0.7 : 1 }}
+          >
+            {polling ? 'Checking...' : 'Check Inbox'}
+          </button>
+        </div>
       </div>
 
       {/* Filter tabs */}

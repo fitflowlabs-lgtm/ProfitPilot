@@ -349,7 +349,16 @@ app.post("/webhooks/app-uninstalled", async (req, res) => {
 // -----------------------------
 app.get("/api/me", async (req, res) => {
   const shop = req.query.shop || req.session.shop;
-  if (!shop) return res.json({ authenticated: false });
+  if (!shop) {
+    // No store connected yet, but user may still be logged in with a valid account
+    if (req.session.userId) {
+      try {
+        const u = await prisma.user.findUnique({ where: { id: req.session.userId }, select: { plan: true, role: true, name: true } });
+        if (u) return res.json({ authenticated: true, shop: null, plan: u.plan || 'free', role: u.role || 'user', needsStore: true });
+      } catch (_) {}
+    }
+    return res.json({ authenticated: false });
+  }
   try {
     let store = await prisma.store.findUnique({ where: { shopDomain: shop } });
     if (!store) return res.json({ authenticated: false, shop });
@@ -412,12 +421,13 @@ app.post("/api/stores/switch", async (req, res) => {
 // API: Auth (email/password)
 // -----------------------------
 app.post("/api/register", async (req, res) => {
-  const { name, email, password } = req.body || {};
+  const { name, password } = req.body || {};
+  const email = (req.body?.email || '').toLowerCase().trim();
   if (!name || !email || !password) {
     return res.status(400).json({ error: "Name, email, and password are required" });
   }
   try {
-    const existing = await prisma.user.findUnique({ where: { email } });
+    const existing = await prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
     if (existing) return res.status(400).json({ error: "An account with this email already exists" });
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({ data: { name, email, passwordHash } });
@@ -430,12 +440,13 @@ app.post("/api/register", async (req, res) => {
 });
 
 app.post("/api/login", async (req, res) => {
-  const { email, password, rememberMe } = req.body || {};
+  const { password, rememberMe } = req.body || {};
+  const email = (req.body?.email || '').toLowerCase().trim();
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
   }
   try {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
     if (!user) return res.status(401).json({ error: "Invalid email or password" });
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return res.status(401).json({ error: "Invalid email or password" });

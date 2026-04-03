@@ -350,7 +350,7 @@ function ConnectStep({ platforms, onNext, onBack }) {
   )
 }
 
-function DoneStep({ userData }) {
+function DoneStep({ userData, onComplete }) {
   const firstName = userData?.user?.name?.trim().split(' ')[0] || ''
   return (
     <div style={{ textAlign: 'center' }}>
@@ -382,14 +382,14 @@ function DoneStep({ userData }) {
         ))}
       </div>
 
-      <button onClick={() => window.location.href = '/'} style={{ width: '100%', marginTop: '1.4rem', padding: '12px', background: c.accent, border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+      <button onClick={onComplete} style={{ width: '100%', marginTop: '1.4rem', padding: '12px', background: c.accent, border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, color: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
         Go to Dashboard →
       </button>
     </div>
   )
 }
 
-export default function OnboardingFlow({ initialStep = 'account', onSwitch }) {
+export default function OnboardingFlow({ initialStep = 'account', onSwitch, onComplete }) {
   const [step, setStep] = useState(initialStep)
   const [data, setData] = useState({})
 
@@ -428,7 +428,7 @@ export default function OnboardingFlow({ initialStep = 'account', onSwitch }) {
           )}
           {step === 'platforms' && <PlatformStep onNext={d => go('connect', d)} onBack={() => setStep('account')} />}
           {step === 'connect'   && <ConnectStep  platforms={data.platforms || []} onNext={d => go('done', d)} onBack={() => setStep('platforms')} />}
-          {step === 'done'      && <DoneStep userData={data} />}
+          {step === 'done'      && <DoneStep userData={data} onComplete={() => onComplete && onComplete(data.user)} />}
         </div>
 
         <p style={{ textAlign: 'center', marginTop: '1.1rem', fontSize: '11px', color: c.muted, lineHeight: 1.8 }}>
