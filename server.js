@@ -10,6 +10,8 @@ const REQUIRED_ENV = [
   "STRIPE_PRICE_ID",
   "STRIPE_WEBHOOK_SECRET",
   "OPENAI_API_KEY",
+  "ZOHO_EMAIL",
+  "ZOHO_PASSWORD",
 ];
 const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
 if (missing.length > 0) {
@@ -67,6 +69,8 @@ const Stripe = require("stripe");
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const PORT = process.env.PORT || 3000;
+const { verifyConnection } = require("./src/mailer");
+const supportRouter = require("./src/routes/support");
 
 // -----------------------------
 // Rate Limiter (in-memory)
@@ -97,6 +101,9 @@ setInterval(() => {
     else rateLimits.set(key, valid);
   }
 }, 5 * 60 * 1000);
+
+// Support router
+app.use("/api/support", supportRouter);
 
 // -----------------------------
 // Helpers
@@ -869,19 +876,6 @@ app.post("/api/webhooks/support-email", async (req, res) => {
   }
 });
 
-app.get("/api/support/tickets", async (req, res) => {
-  if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
-  try {
-    const tickets = await prisma.supportTicket.findMany({
-      orderBy: { createdAt: "desc" },
-      include: { user: { select: { name: true, email: true, plan: true } } },
-    });
-    res.json({ tickets });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
 app.post("/api/webhooks/stripe", async (req, res) => {
   const sig = req.headers["stripe-signature"];
   let event;
@@ -934,6 +928,7 @@ app.use((err, req, res, next) => { console.error("Unhandled:", err.message); res
 
 app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT} (${process.env.NODE_ENV || "development"})`);
+  verifyConnection().then(() => console.log("Mailer: Zoho SMTP connected")).catch((e) => console.error("Mailer: Zoho SMTP failed:", e.message));
   // Verify DB tables exist on startup so issues are immediately visible in logs
   try {
     await prisma.user.count();

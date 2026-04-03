@@ -12,6 +12,7 @@ import InventoryPage from './pages/InventoryPage'
 import DealsPage from './pages/DealsPage'
 import PaymentSuccessPage from './pages/PaymentSuccessPage'
 import SettingsPage from './pages/SettingsPage'
+import SupportPage from './pages/SupportPage'
 
 const PAGE_TITLES = {
   dashboard: 'Dashboard',
@@ -20,6 +21,7 @@ const PAGE_TITLES = {
   inventory: 'Inventory',
   deals: 'Deal Simulator',
   settings: 'Settings',
+  'support-admin': 'Support Admin',
 }
 
 function HelpButton() {
@@ -321,6 +323,7 @@ export default function App() {
       case 'inventory': return <InventoryPage {...props} />
       case 'deals': return <DealsPage {...props} />
       case 'settings': return <SettingsPage stores={stores} onNavigate={setActivePage} />
+      case 'support-admin': return <SupportPage />
       default: return <DashboardPage {...props} onNavigate={setActivePage} />
     }
   }
