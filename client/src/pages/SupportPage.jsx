@@ -29,7 +29,18 @@ function formatDate(iso) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-export default function SupportPage() {
+export default function SupportPage({ isAdmin }) {
+  if (!isAdmin) {
+    return (
+      <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '2rem', marginBottom: 12 }}>🔒</div>
+          <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>Access Denied</div>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>You do not have permission to view this page.</p>
+        </div>
+      </div>
+    )
+  }
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')

@@ -104,8 +104,8 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-// Support router
-app.use("/api/support", supportRouter);
+// Support router (admin only)
+app.use("/api/support", requireAdmin, supportRouter);
 
 // -----------------------------
 // Helpers
@@ -147,6 +147,17 @@ async function fetchShopifyWrite(url, method, body, store) {
   try { data = await response.json(); } catch (e) { data = null; }
   if (response.status === 401) { const err = new Error("Shopify token expired"); err.code = "REAUTH_REQUIRED"; err.shop = store.shopDomain; throw err; }
   return { response, data };
+}
+
+async function requireAdmin(req, res, next) {
+  if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.session.userId }, select: { role: true } });
+    if (!user || user.role !== "admin") return res.status(403).json({ error: "Admin access required" });
+    next();
+  } catch (e) {
+    res.status(500).json({ error: "Could not verify role" });
+  }
 }
 
 async function requireStore(req, res, next) {
@@ -354,13 +365,14 @@ app.get("/api/me", async (req, res) => {
     }
     req.session.shop = shop;
     let plan = "free";
+    let role = "user";
     if (req.session.userId) {
       try {
-        const u = await prisma.user.findUnique({ where: { id: req.session.userId }, select: { plan: true } });
-        if (u) plan = u.plan;
+        const u = await prisma.user.findUnique({ where: { id: req.session.userId }, select: { plan: true, role: true } });
+        if (u) { plan = u.plan; role = u.role; }
       } catch (_) {}
     }
-    res.json({ authenticated: true, shop: store.shopDomain, shopName: store.shopName, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt, plan });
+    res.json({ authenticated: true, shop: store.shopDomain, shopName: store.shopName, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt, plan, role });
   } catch (e) {
     console.error("/api/me error:", e.message);
     res.status(500).json({ error: "Session check failed: " + e.message });
@@ -443,7 +455,7 @@ app.post("/api/login", async (req, res) => {
     }
     if (store) {
       req.session.shop = store.shopDomain;
-      return res.json({ authenticated: true, shop: store.shopDomain, shopName: store.shopName, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt, plan: user.plan || "free" });
+      return res.json({ authenticated: true, shop: store.shopDomain, shopName: store.shopName, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt, plan: user.plan || "free", role: user.role || "user" });
     }
     res.json({ authenticated: false, needsShopify: true });
   } catch (e) {

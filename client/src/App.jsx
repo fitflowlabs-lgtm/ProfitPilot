@@ -323,7 +323,7 @@ export default function App() {
       case 'inventory': return <InventoryPage {...props} />
       case 'deals': return <DealsPage {...props} />
       case 'settings': return <SettingsPage stores={stores} onNavigate={setActivePage} />
-      case 'support-admin': return <SupportPage />
+      case 'support-admin': return <SupportPage isAdmin={auth.role === 'admin'} />
       default: return <DashboardPage {...props} onNavigate={setActivePage} />
     }
   }
@@ -343,6 +343,7 @@ export default function App() {
         stores={stores}
         onSwitchStore={handleSwitchStore}
         onStoreConnected={fetchStores}
+        role={auth.role}
       />
 
       <main className="main-content">
