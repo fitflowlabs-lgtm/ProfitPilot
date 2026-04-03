@@ -174,13 +174,13 @@ export default function SupportPage({ isAdmin }) {
       const res = await fetch(`${API}/poll`, { method: 'POST', credentials: 'include' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Poll failed')
-      setPollMsg('Inbox checked.')
+      const summary = data.logs?.join('\n') || 'Inbox checked.'
+      setPollMsg(summary)
       await fetchTickets()
     } catch (e) {
       setPollMsg(e.message)
     } finally {
       setPolling(false)
-      setTimeout(() => setPollMsg(''), 4000)
     }
   }
 
@@ -197,18 +197,26 @@ export default function SupportPage({ isAdmin }) {
             Review and send AI-drafted replies to support emails.
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {pollMsg && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{pollMsg}</span>}
-          <button
-            className="btn btn-ghost"
-            onClick={handlePoll}
-            disabled={polling}
-            style={{ fontSize: '0.82rem', opacity: polling ? 0.7 : 1 }}
-          >
-            {polling ? 'Checking...' : 'Check Inbox'}
-          </button>
-        </div>
+        <button
+          className="btn btn-ghost"
+          onClick={handlePoll}
+          disabled={polling}
+          style={{ fontSize: '0.82rem', opacity: polling ? 0.7 : 1 }}
+        >
+          {polling ? 'Checking...' : 'Check Inbox'}
+        </button>
       </div>
+
+      {pollMsg && (
+        <pre style={{
+          background: 'var(--surface-raised)', border: '1px solid var(--border)',
+          borderRadius: 8, padding: '10px 14px', fontSize: '0.75rem',
+          color: 'var(--text-muted)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          marginBottom: 16,
+        }}>
+          {pollMsg}
+        </pre>
+      )}
 
       {/* Filter tabs */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>

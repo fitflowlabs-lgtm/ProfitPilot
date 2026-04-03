@@ -140,11 +140,19 @@ router.post("/:id/regenerate", requireAuth, async (req, res) => {
 
 // POST /poll — manually trigger inbox check (admin only)
 router.post("/poll", requireAuth, async (req, res) => {
+  const logs = [];
+  const origLog = console.log;
+  const origError = console.error;
+  console.log = (...args) => { logs.push(args.join(' ')); origLog(...args); };
+  console.error = (...args) => { logs.push('ERROR: ' + args.join(' ')); origError(...args); };
   try {
     await pollInbox();
-    res.json({ ok: true });
+    res.json({ ok: true, logs });
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    res.status(500).json({ error: e.message, logs });
+  } finally {
+    console.log = origLog;
+    console.error = origError;
   }
 });
 
