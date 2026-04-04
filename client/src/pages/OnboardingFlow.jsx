@@ -433,9 +433,9 @@ export default function OnboardingFlow({ initialStep = 'account', onSwitch, onCo
 
         <p style={{ textAlign: 'center', marginTop: '1.1rem', fontSize: '11px', color: c.muted, lineHeight: 1.8 }}>
           By creating an account you agree to our{' '}
-          <a href="#" style={{ color: c.accent, textDecoration: 'none' }}>Terms of Service</a>
+          <a href="/terms" target="_blank" rel="noreferrer" style={{ color: c.accent, textDecoration: 'none' }}>Terms of Service</a>
           {' '}and{' '}
-          <a href="#" style={{ color: c.accent, textDecoration: 'none' }}>Privacy Policy</a>.
+          <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: c.accent, textDecoration: 'none' }}>Privacy Policy</a>.
         </p>
       </div>
     </div>

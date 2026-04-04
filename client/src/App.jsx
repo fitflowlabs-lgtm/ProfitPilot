@@ -13,6 +13,8 @@ import DealsPage from './pages/DealsPage'
 import PaymentSuccessPage from './pages/PaymentSuccessPage'
 import SettingsPage from './pages/SettingsPage'
 import SupportPage from './pages/SupportPage'
+import TermsPage from './pages/TermsPage'
+import PrivacyPage from './pages/PrivacyPage'
 
 const PAGE_TITLES = {
   dashboard: 'Dashboard',
@@ -257,6 +259,10 @@ export default function App() {
     }
     setSyncing(false)
   }, [auth, syncing])
+
+  // 📄 PUBLIC PAGES
+  if (window.location.pathname === '/terms') return <TermsPage />
+  if (window.location.pathname === '/privacy') return <PrivacyPage />
 
   // 💳 PAYMENT SUCCESS
   if (activePage === 'payment-success') {
