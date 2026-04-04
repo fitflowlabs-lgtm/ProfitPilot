@@ -15,6 +15,7 @@ import SettingsPage from './pages/SettingsPage'
 import SupportPage from './pages/SupportPage'
 import TermsPage from './pages/TermsPage'
 import PrivacyPage from './pages/PrivacyPage'
+import VerifyEmailPage from './pages/VerifyEmailPage'
 
 const PAGE_TITLES = {
   dashboard: 'Dashboard',
@@ -24,6 +25,51 @@ const PAGE_TITLES = {
   deals: 'Deal Simulator',
   settings: 'Settings',
   'support-admin': 'Support Admin',
+}
+
+function EmailVerificationBanner({ email }) {
+  const [sent, setSent] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  const handleResend = async () => {
+    setLoading(true)
+    try {
+      await api.resendVerification()
+      setSent(true)
+    } catch (_) {}
+    setLoading(false)
+  }
+
+  return (
+    <div style={{
+      background: '#1e3a5f', borderBottom: '1px solid #2d5a9e',
+      padding: '9px 24px', display: 'flex', alignItems: 'center',
+      gap: 12, fontSize: '0.82rem', color: '#93c5fd', flexWrap: 'wrap',
+    }}>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      <span>
+        Please verify your email address. We sent a link to <strong style={{ color: '#bfdbfe' }}>{email}</strong>.
+      </span>
+      {sent ? (
+        <span style={{ color: '#86efac', fontWeight: 600 }}>Email sent!</span>
+      ) : (
+        <button
+          onClick={handleResend}
+          disabled={loading}
+          style={{
+            background: 'none', border: 'none', color: '#60a5fa',
+            cursor: loading ? 'not-allowed' : 'pointer', fontWeight: 600,
+            fontSize: '0.82rem', fontFamily: 'inherit', padding: 0,
+            textDecoration: 'underline', opacity: loading ? 0.6 : 1,
+          }}
+        >
+          {loading ? 'Sending…' : 'Resend email'}
+        </button>
+      )}
+    </div>
+  )
 }
 
 function HelpButton() {
@@ -263,6 +309,7 @@ export default function App() {
   // 📄 PUBLIC PAGES
   if (window.location.pathname === '/terms') return <TermsPage />
   if (window.location.pathname === '/privacy') return <PrivacyPage />
+  if (window.location.pathname === '/verify-email') return <VerifyEmailPage />
 
   // 💳 PAYMENT SUCCESS
   if (activePage === 'payment-success') {
@@ -370,6 +417,7 @@ export default function App() {
       />
 
       <main className="main-content">
+        {auth.emailVerified === false && <EmailVerificationBanner email={auth.email} />}
         <Header
           title={PAGE_TITLES[activePage]}
           syncing={syncing}

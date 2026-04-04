@@ -8,15 +8,18 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 model User {
-  id                   String   @id @default(cuid())
+  id                   String    @id @default(cuid())
   name                 String
-  email                String   @unique
+  email                String    @unique
   passwordHash         String
-  plan                 String   @default("free")
-  role                 String   @default("user")
+  plan                 String    @default("free")
+  role                 String    @default("user")
   stripeCustomerId     String?
   stripeSubscriptionId String?
-  createdAt            DateTime @default(now())
+  emailVerified        Boolean   @default(false)
+  verifyToken          String?   @unique
+  verifyTokenExpiry    DateTime?
+  createdAt            DateTime  @default(now())
 
   stores         Store[]
   supportTickets SupportTicket[]

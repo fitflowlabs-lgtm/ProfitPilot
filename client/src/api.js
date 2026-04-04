@@ -43,6 +43,8 @@ export const api = {
   // Auth
   login: (body) => request("/login", { method: "POST", body: JSON.stringify(body) }),
   register: (body) => request("/register", { method: "POST", body: JSON.stringify(body) }),
+  verifyEmail: (token) => request(`/verify-email?token=${encodeURIComponent(token)}`),
+  resendVerification: () => request("/resend-verification", { method: "POST" }),
 
   // Sync
   syncAll: (shop) =>

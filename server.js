@@ -69,7 +69,7 @@ const Stripe = require("stripe");
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const PORT = process.env.PORT || 3000;
-const { verifyConnection } = require("./src/mailer");
+const { verifyConnection, sendVerificationEmail } = require("./src/mailer");
 const supportRouter = require("./src/routes/support");
 const { createSupportTicket } = require("./src/supportHelper");
 const { startPoller } = require("./src/emailPoller");
@@ -353,8 +353,8 @@ app.get("/api/me", async (req, res) => {
     // No store connected yet, but user may still be logged in with a valid account
     if (req.session.userId) {
       try {
-        const u = await prisma.user.findUnique({ where: { id: req.session.userId }, select: { plan: true, role: true, name: true } });
-        if (u) return res.json({ authenticated: true, shop: null, plan: u.plan || 'free', role: u.role || 'user', needsStore: true });
+        const u = await prisma.user.findUnique({ where: { id: req.session.userId }, select: { plan: true, role: true, name: true, emailVerified: true } });
+        if (u) return res.json({ authenticated: true, shop: null, plan: u.plan || 'free', role: u.role || 'user', emailVerified: u.emailVerified, needsStore: true });
       } catch (_) {}
     }
     return res.json({ authenticated: false });
@@ -375,13 +375,15 @@ app.get("/api/me", async (req, res) => {
     req.session.shop = shop;
     let plan = "free";
     let role = "user";
+    let emailVerified = true;
+    let userEmail = null;
     if (req.session.userId) {
       try {
-        const u = await prisma.user.findUnique({ where: { id: req.session.userId }, select: { plan: true, role: true } });
-        if (u) { plan = u.plan; role = u.role; }
+        const u = await prisma.user.findUnique({ where: { id: req.session.userId }, select: { plan: true, role: true, emailVerified: true, email: true } });
+        if (u) { plan = u.plan; role = u.role; emailVerified = u.emailVerified; userEmail = u.email; }
       } catch (_) {}
     }
-    res.json({ authenticated: true, shop: store.shopDomain, shopName: store.shopName, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt, plan, role });
+    res.json({ authenticated: true, shop: store.shopDomain, shopName: store.shopName, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt, plan, role, emailVerified, email: userEmail });
   } catch (e) {
     console.error("/api/me error:", e.message);
     res.status(500).json({ error: "Session check failed: " + e.message });
@@ -430,9 +432,12 @@ app.post("/api/register", async (req, res) => {
     const existing = await prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
     if (existing) return res.status(400).json({ error: "An account with this email already exists" });
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await prisma.user.create({ data: { name, email, passwordHash } });
+    const verifyToken = crypto.randomBytes(32).toString("hex");
+    const verifyTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const user = await prisma.user.create({ data: { name, email, passwordHash, verifyToken, verifyTokenExpiry } });
     req.session.userId = user.id;
-    res.json({ ok: true, userId: user.id, name: user.name, email: user.email });
+    try { await sendVerificationEmail(email, name, verifyToken); } catch (e) { console.error("Verification email failed:", e.message); }
+    res.json({ ok: true, userId: user.id, name: user.name, email: user.email, emailVerified: false });
   } catch (e) {
     console.error("Register error:", e.message);
     res.status(500).json({ error: "Failed to create account" });
@@ -466,7 +471,7 @@ app.post("/api/login", async (req, res) => {
     }
     if (store) {
       req.session.shop = store.shopDomain;
-      return res.json({ authenticated: true, shop: store.shopDomain, shopName: store.shopName, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt, plan: user.plan || "free", role: user.role || "user" });
+      return res.json({ authenticated: true, shop: store.shopDomain, shopName: store.shopName, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt, plan: user.plan || "free", role: user.role || "user", emailVerified: user.emailVerified, email: user.email });
     }
     res.json({ authenticated: false, needsShopify: true });
   } catch (e) {
@@ -476,6 +481,45 @@ app.post("/api/login", async (req, res) => {
       return res.status(500).json({ error: "Database not set up yet. Please contact support." });
     }
     res.status(500).json({ error: "Login failed: " + e.message });
+  }
+});
+
+// GET /api/verify-email?token=...
+app.get("/api/verify-email", async (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.status(400).json({ error: "Missing token" });
+  try {
+    const user = await prisma.user.findFirst({ where: { verifyToken: token } });
+    if (!user) return res.status(400).json({ error: "Invalid or expired verification link." });
+    if (user.verifyTokenExpiry < new Date()) {
+      return res.status(400).json({ error: "This verification link has expired. Please request a new one." });
+    }
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true, verifyToken: null, verifyTokenExpiry: null },
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("Verify email error:", e.message);
+    res.status(500).json({ error: "Verification failed. Please try again." });
+  }
+});
+
+// POST /api/resend-verification
+app.post("/api/resend-verification", async (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ error: "Not authenticated" });
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.session.userId } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+    if (user.emailVerified) return res.json({ ok: true });
+    const verifyToken = crypto.randomBytes(32).toString("hex");
+    const verifyTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await prisma.user.update({ where: { id: user.id }, data: { verifyToken, verifyTokenExpiry } });
+    await sendVerificationEmail(user.email, user.name, verifyToken);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("Resend verification error:", e.message);
+    res.status(500).json({ error: "Failed to resend verification email." });
   }
 });
 
