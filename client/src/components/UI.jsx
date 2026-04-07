@@ -2,17 +2,17 @@ import { useState, useEffect, useRef } from 'react'
 
 export function StatusBadge({ status }) {
   const map = {
-    good: { cls: 'badge-good', label: 'Good' },
-    okay: { cls: 'badge-warn', label: 'Okay' },
-    low: { cls: 'badge-bad', label: 'Low' },
-    losing: { cls: 'badge-bad', label: 'Losing $' },
-    missing_cost: { cls: 'badge-muted', label: 'No Cost' },
-    urgent: { cls: 'badge-bad', label: 'Urgent' },
-    soon: { cls: 'badge-warn', label: 'Reorder Soon' },
-    overstock: { cls: 'badge-warn', label: 'Overstock' },
-    no_data: { cls: 'badge-muted', label: 'No Data' },
-    bad: { cls: 'badge-bad', label: 'Bad' },
-    risky: { cls: 'badge-warn', label: 'Risky' },
+    good:         { cls: 'badge-good',  label: 'Good'        },
+    okay:         { cls: 'badge-warn',  label: 'Okay'        },
+    low:          { cls: 'badge-bad',   label: 'Low'         },
+    losing:       { cls: 'badge-bad',   label: 'Losing'      },
+    missing_cost: { cls: 'badge-muted', label: 'No Cost'     },
+    urgent:       { cls: 'badge-bad',   label: 'Urgent'      },
+    soon:         { cls: 'badge-warn',  label: 'Reorder Soon'},
+    overstock:    { cls: 'badge-warn',  label: 'Overstock'   },
+    no_data:      { cls: 'badge-muted', label: 'No Data'     },
+    bad:          { cls: 'badge-bad',   label: 'Bad'         },
+    risky:        { cls: 'badge-warn',  label: 'Risky'       },
   }
   const { cls, label } = map[status] || { cls: 'badge-muted', label: status }
   return (
@@ -25,7 +25,7 @@ export function StatusBadge({ status }) {
 
 export function MetricCard({ label, value, sub, color = 'accent' }) {
   return (
-    <div className={`metric-card ${color}`}>
+    <div className={`metric-card ${color} animate-in`}>
       <div className="metric-label">{label}</div>
       <div className="metric-value">{value}</div>
       {sub && <div className="metric-sub">{sub}</div>}
@@ -36,12 +36,24 @@ export function MetricCard({ label, value, sub, color = 'accent' }) {
 export function Loading() {
   return (
     <div className="loading-center">
-      <div className="loading-spinner" />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+        {/* Refined ring spinner */}
+        <div style={{
+          width: 28, height: 28,
+          border: '1.5px solid var(--border)',
+          borderTopColor: 'var(--accent)',
+          borderRadius: '50%',
+          animation: 'spin 0.7s linear infinite',
+        }} />
+        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
+          Loading
+        </span>
+      </div>
     </div>
   )
 }
 
-// Typewriter hook — types text out character by character
+/* Typewriter hook */
 function useTypewriter(text, charsPerTick = 3, tickMs = 16) {
   const [displayed, setDisplayed] = useState('')
   const [done, setDone] = useState(false)
@@ -54,11 +66,8 @@ function useTypewriter(text, charsPerTick = 3, tickMs = 16) {
       prevTextRef.current = null
       return
     }
-
-    // If same text, don't re-animate
     if (text === prevTextRef.current) return
     prevTextRef.current = text
-
     setDisplayed('')
     setDone(false)
     let index = 0
@@ -85,11 +94,19 @@ export function AICard({ label, children, loading, onClose }) {
   const { displayed, done } = useTypewriter(loading ? null : text)
 
   return (
-    <div className="ai-card">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div className="ai-label">✦ {label}</div>
+    <div className="ai-card animate-in">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div className="ai-label">
+          {/* Pulsing dot instead of emoji */}
+          <span className="ai-label-dot" />
+          {label}
+        </div>
         {onClose && !loading && (
-          <button className="ai-close-btn" onClick={onClose}>✕</button>
+          <button className="ai-close-btn" onClick={onClose} aria-label="Dismiss">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </button>
         )}
       </div>
       <div className="ai-text">
@@ -98,7 +115,7 @@ export function AICard({ label, children, loading, onClose }) {
             <div className="ai-loading-dots">
               <span /><span /><span />
             </div>
-            <span>Thinking…</span>
+            <span>Thinking</span>
           </div>
         ) : text ? (
           <>
@@ -115,12 +132,13 @@ export function AIButton({ onClick, loading, variant = 'default' }) {
   const isUrgent = variant === 'urgent'
   return (
     <button
-      className={`ai-analyze-btn ${isUrgent ? 'ai-analyze-btn--urgent' : ''}`}
+      className={`ai-analyze-btn${isUrgent ? ' ai-analyze-btn--urgent' : ''}`}
       onClick={onClick}
       disabled={loading}
     >
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+      {/* Spark icon */}
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
       </svg>
       {loading ? 'Analyzing…' : 'Analyze'}
     </button>
@@ -141,7 +159,7 @@ export function formatPercent(val) {
 
 export function marginColor(val) {
   if (val == null) return undefined
-  if (val < 0) return 'var(--red)'
+  if (val < 0)  return 'var(--red)'
   if (val < 40) return 'var(--red)'
   if (val < 60) return 'var(--yellow)'
   return 'var(--green)'
