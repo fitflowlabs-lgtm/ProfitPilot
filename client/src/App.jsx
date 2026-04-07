@@ -357,27 +357,23 @@ export default function App() {
       <OnboardingFlow
         initialStep={onboardingStep}
         onSwitch={() => setAuthMode('login')}
-        onComplete={(user) => setAuth(user)}
-      />
-    )
-  }
-
-  // Logged in but no store connected yet — show connect step
-  if (auth.needsStore) {
-    return (
-      <OnboardingFlow
-        initialStep="connect"
-        onSwitch={handleLogout}
         onComplete={() => {
-          // After skipping/connecting, re-check session
           api.me().then((data) => {
-            if (data?.authenticated) { setAuth(data); if (!data.needsStore) fetchStores() }
-            else setAuth(false)
-          })
+            if (data?.authenticated) {
+              setAuth(data)
+              try { localStorage.setItem('mp_auth', JSON.stringify(data)) } catch {}
+              if (!data.needsStore) fetchStores()
+            } else {
+              setAuth(false)
+              try { localStorage.removeItem('mp_auth') } catch {}
+            }
+          }).catch(() => {})
         }}
       />
     )
   }
+
+  // auth.needsStore — fall through to the main shell; sidebar has "Connect new store"
 
   const isPaid = auth.plan && auth.plan !== 'free'
 
@@ -414,6 +410,27 @@ export default function App() {
       />
 
       <main className="main-content">
+        {!auth.shop && (
+          <div style={{
+            background: '#F0FDF4', borderBottom: '1px solid #BBF7D0',
+            padding: '10px 28px', display: 'flex', alignItems: 'center', gap: 10,
+            fontSize: '0.81rem', color: '#166534', flexWrap: 'wrap',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><circle cx="7" cy="7" r="1" fill="#16a34a" stroke="none"/>
+            </svg>
+            <span>No Shopify store connected yet —</span>
+            <button
+              style={{ background: 'none', border: 'none', color: '#15803D', cursor: 'pointer', fontWeight: 700, fontSize: '0.81rem', fontFamily: 'inherit', padding: 0, textDecoration: 'underline' }}
+              onClick={() => {
+                const shop = window.prompt('Enter your store name (just the part before .myshopify.com):')
+                if (shop) window.location.href = `/auth?shop=${encodeURIComponent(shop.trim().replace(/\.myshopify\.com$/, '') + '.myshopify.com')}`
+              }}
+            >
+              Connect Shopify store
+            </button>
+          </div>
+        )}
         {auth.emailVerified === false && <EmailVerificationBanner email={auth.email} />}
         <Header
           title={PAGE_TITLES[activePage]}
