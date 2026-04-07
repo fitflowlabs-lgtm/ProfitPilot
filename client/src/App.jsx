@@ -400,7 +400,7 @@ export default function App() {
         <LoginPage
           onSwitch={() => { setOnboardingStep('account'); setAuthMode('onboarding') }}
           onNeedsShopify={() => { setOnboardingStep('connect'); setAuthMode('onboarding') }}
-          onLogin={(user) => setAuth(user)}
+          onLogin={(user) => { setAuth(user); fetchStores() }}
         />
       )
     }
