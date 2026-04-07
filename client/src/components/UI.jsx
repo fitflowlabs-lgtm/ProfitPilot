@@ -1,18 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
 
+/* ─── Status Badge ─────────────────────────── */
 export function StatusBadge({ status }) {
   const map = {
-    good:         { cls: 'badge-good',  label: 'Good'        },
-    okay:         { cls: 'badge-warn',  label: 'Okay'        },
-    low:          { cls: 'badge-bad',   label: 'Low'         },
-    losing:       { cls: 'badge-bad',   label: 'Losing'      },
-    missing_cost: { cls: 'badge-muted', label: 'No Cost'     },
-    urgent:       { cls: 'badge-bad',   label: 'Urgent'      },
-    soon:         { cls: 'badge-warn',  label: 'Reorder Soon'},
-    overstock:    { cls: 'badge-warn',  label: 'Overstock'   },
-    no_data:      { cls: 'badge-muted', label: 'No Data'     },
-    bad:          { cls: 'badge-bad',   label: 'Bad'         },
-    risky:        { cls: 'badge-warn',  label: 'Risky'       },
+    good:         { cls: 'badge-good',  label: 'Good'         },
+    okay:         { cls: 'badge-warn',  label: 'Okay'         },
+    low:          { cls: 'badge-bad',   label: 'Low'          },
+    losing:       { cls: 'badge-bad',   label: 'Losing'       },
+    missing_cost: { cls: 'badge-muted', label: 'No Cost'      },
+    urgent:       { cls: 'badge-bad',   label: 'Urgent'       },
+    soon:         { cls: 'badge-warn',  label: 'Reorder Soon' },
+    overstock:    { cls: 'badge-warn',  label: 'Overstock'    },
+    no_data:      { cls: 'badge-muted', label: 'No Data'      },
+    bad:          { cls: 'badge-bad',   label: 'Bad'          },
+    risky:        { cls: 'badge-warn',  label: 'Risky'        },
   }
   const { cls, label } = map[status] || { cls: 'badge-muted', label: status }
   return (
@@ -23,6 +24,8 @@ export function StatusBadge({ status }) {
   )
 }
 
+/* ─── Metric Card ──────────────────────────── */
+/* Sits inside .metrics-row which is a unified strip — no individual card border */
 export function MetricCard({ label, value, sub, color = 'accent' }) {
   return (
     <div className={`metric-card ${color} animate-in`}>
@@ -33,19 +36,16 @@ export function MetricCard({ label, value, sub, color = 'accent' }) {
   )
 }
 
+/* ─── Loading ──────────────────────────────── */
 export function Loading() {
   return (
     <div className="loading-center">
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-        {/* Refined ring spinner */}
-        <div style={{
-          width: 28, height: 28,
-          border: '1.5px solid var(--border)',
-          borderTopColor: 'var(--accent)',
-          borderRadius: '50%',
-          animation: 'spin 0.7s linear infinite',
-        }} />
-        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style={{ animation: 'spin 0.9s linear infinite' }}>
+          <circle cx="16" cy="16" r="13" stroke="var(--border)" strokeWidth="2"/>
+          <path d="M16 3a13 13 0 0113 13" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'var(--font-body)' }}>
           Loading
         </span>
       </div>
@@ -53,42 +53,30 @@ export function Loading() {
   )
 }
 
-/* Typewriter hook */
+/* ─── Typewriter hook ──────────────────────── */
 function useTypewriter(text, charsPerTick = 3, tickMs = 16) {
   const [displayed, setDisplayed] = useState('')
   const [done, setDone] = useState(false)
-  const prevTextRef = useRef(null)
+  const prevRef = useRef(null)
 
   useEffect(() => {
-    if (!text) {
-      setDisplayed('')
-      setDone(false)
-      prevTextRef.current = null
-      return
-    }
-    if (text === prevTextRef.current) return
-    prevTextRef.current = text
-    setDisplayed('')
-    setDone(false)
-    let index = 0
-
-    const interval = setInterval(() => {
-      index += charsPerTick
-      if (index >= text.length) {
-        setDisplayed(text)
-        setDone(true)
-        clearInterval(interval)
-      } else {
-        setDisplayed(text.slice(0, index))
-      }
+    if (!text) { setDisplayed(''); setDone(false); prevRef.current = null; return }
+    if (text === prevRef.current) return
+    prevRef.current = text
+    setDisplayed(''); setDone(false)
+    let i = 0
+    const iv = setInterval(() => {
+      i += charsPerTick
+      if (i >= text.length) { setDisplayed(text); setDone(true); clearInterval(iv) }
+      else setDisplayed(text.slice(0, i))
     }, tickMs)
-
-    return () => clearInterval(interval)
+    return () => clearInterval(iv)
   }, [text, charsPerTick, tickMs])
 
   return { displayed, done }
 }
 
+/* ─── AI Card ──────────────────────────────── */
 export function AICard({ label, children, loading, onClose }) {
   const text = typeof children === 'string' ? children : null
   const { displayed, done } = useTypewriter(loading ? null : text)
@@ -97,7 +85,6 @@ export function AICard({ label, children, loading, onClose }) {
     <div className="ai-card animate-in">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <div className="ai-label">
-          {/* Pulsing dot instead of emoji */}
           <span className="ai-label-dot" />
           {label}
         </div>
@@ -112,27 +99,22 @@ export function AICard({ label, children, loading, onClose }) {
       <div className="ai-text">
         {loading ? (
           <div className="ai-loading">
-            <div className="ai-loading-dots">
-              <span /><span /><span />
-            </div>
-            <span>Thinking</span>
+            <div className="ai-loading-dots"><span /><span /><span /></div>
+            <span>Analyzing your data</span>
           </div>
         ) : text ? (
-          <>
-            {displayed}
-            {!done && <span className="ai-cursor" />}
-          </>
+          <>{displayed}{!done && <span className="ai-cursor" />}</>
         ) : children}
       </div>
     </div>
   )
 }
 
+/* ─── AI Button ────────────────────────────── */
 export function AIButton({ onClick, loading, variant = 'default' }) {
-  const isUrgent = variant === 'urgent'
   return (
     <button
-      className={`ai-analyze-btn${isUrgent ? ' ai-analyze-btn--urgent' : ''}`}
+      className={`ai-analyze-btn${variant === 'urgent' ? ' ai-analyze-btn--urgent' : ''}`}
       onClick={onClick}
       disabled={loading}
     >
@@ -145,6 +127,7 @@ export function AIButton({ onClick, loading, variant = 'default' }) {
   )
 }
 
+/* ─── Formatters ───────────────────────────── */
 export function formatCurrency(val) {
   if (val == null) return '—'
   const n = Number(val)

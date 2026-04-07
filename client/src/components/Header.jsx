@@ -4,37 +4,35 @@ export default function Header({ title, syncing, lastSync, onSync, onLogout, onT
   return (
     <header className="header-bar">
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {/* Mobile hamburger */}
         <button
           className="btn btn-ghost btn-sm hamburger-btn"
           onClick={onToggleSidebar}
-          aria-label="Toggle sidebar"
+          aria-label="Toggle navigation"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
             <line x1="3" y1="8"  x2="21" y2="8"/>
             <line x1="3" y1="14" x2="16" y2="14"/>
           </svg>
         </button>
+
         <h2 className="header-title">{title}</h2>
       </div>
 
       <div className="header-actions">
-        {/* Sync status pill */}
+        {/* Live sync indicator */}
         <div className="sync-pill">
           <span
             className="sync-dot"
-            style={syncing ? { animation: 'spin 1s linear infinite', background: 'var(--accent-light)' } : {}}
+            style={syncing ? { animation: 'spin 1s linear infinite', background: 'var(--accent)' } : {}}
           />
-          <span style={{ fontVariantNumeric: 'tabular-nums' }}>
-            {syncing ? 'Syncing…' : syncLabel}
-          </span>
+          {syncing ? 'Syncing…' : syncLabel}
         </div>
 
-        {/* Sync button */}
         <button
           className="btn btn-ghost btn-sm"
           onClick={onSync}
           disabled={syncing}
-          aria-label="Sync data"
           title="Sync Shopify data"
         >
           <svg
@@ -49,10 +47,8 @@ export default function Header({ title, syncing, lastSync, onSync, onLogout, onT
           Sync
         </button>
 
-        {/* Divider */}
-        <div style={{ width: 1, height: 18, background: 'var(--border)', flexShrink: 0 }} />
+        <div style={{ width: 1, height: 16, background: 'var(--border)', flexShrink: 0 }} />
 
-        {/* Logout */}
         <button
           className="btn btn-ghost btn-sm"
           onClick={onLogout}
@@ -66,11 +62,11 @@ export default function Header({ title, syncing, lastSync, onSync, onLogout, onT
 }
 
 function timeAgo(date) {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
-  if (seconds < 60) return 'just now'
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
+  const s = Math.floor((Date.now() - date.getTime()) / 1000)
+  if (s < 60) return 'just now'
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h}h ago`
+  return `${Math.floor(h / 24)}d ago`
 }
