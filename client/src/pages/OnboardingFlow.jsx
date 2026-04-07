@@ -284,16 +284,18 @@ function ConnectStep({ platforms, onNext, onBack }) {
     window.location.href = `/auth?shop=${encodeURIComponent(raw + '.myshopify.com')}`
   }
 
-  const platformNames = platforms.map(id => PLATFORMS.find(p => p.id === id)?.name).join(' & ')
+  const platformNames = platforms.length > 0
+    ? platforms.map(id => PLATFORMS.find(p => p.id === id)?.name).join(' & ')
+    : 'Shopify'
 
   return (
     <div>
       <h2 style={{ margin: '0 0 0.35rem', fontSize: '1.35rem', fontWeight: 700, color: c.text, letterSpacing: '-0.02em' }}>Link your stores</h2>
       <p style={{ margin: '0 0 1.6rem', fontSize: '13px', color: c.muted, lineHeight: 1.6 }}>
-        Let's connect your {platformNames} {platforms.length === 1 ? 'store' : 'stores'} so we can start tracking your margins.
+        Let's connect your {platformNames} {platforms.length <= 1 ? 'store' : 'stores'} so we can start tracking your margins.
       </p>
 
-      {platforms.includes('shopify') && (
+      {(platforms.includes('shopify') || platforms.length === 0) && (
         <div style={{ background: c.surface2, border: `1px solid ${c.border}`, borderRadius: '10px', padding: '18px', marginBottom: '1rem' }}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '12px' }}>
