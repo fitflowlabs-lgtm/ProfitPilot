@@ -220,7 +220,12 @@ function PaywallOverlay({ onLogout }) {
 }
 
 export default function App() {
-  const [auth, setAuth] = useState(null)
+  const [auth, setAuth] = useState(() => {
+    try {
+      const cached = localStorage.getItem('mp_auth')
+      return cached ? JSON.parse(cached) : null
+    } catch { return null }
+  })
   const [authMode, setAuthMode] = useState('login')
   const [onboardingStep, setOnboardingStep] = useState('account')
   const [activePage, setActivePage] = useState('dashboard')
@@ -259,17 +264,22 @@ export default function App() {
       .then((data) => {
         if (data?.authenticated) {
           setAuth(data)
+          try { localStorage.setItem('mp_auth', JSON.stringify(data)) } catch {}
           if (shop) window.history.replaceState({}, '', '/')
           if (!data.needsStore) fetchStores()
         } else {
           setAuth(false)
+          try { localStorage.removeItem('mp_auth') } catch {}
         }
       })
-      .catch(() => setAuth(false))
+      .catch(() => {
+        // Keep cached auth on network error so app doesn't flash to login
+      })
   }, [])
 
   const handleLogout = async () => {
     await api.logout()
+    try { localStorage.removeItem('mp_auth') } catch {}
     setAuth(false)
   }
 
@@ -309,27 +319,15 @@ export default function App() {
         onContinue={() => {
           window.history.replaceState({}, '', '/')
           setActivePage('dashboard')
-          api.me().then((data) => { if (data?.authenticated) { setAuth(data); fetchStores() } })
+          api.me().then((data) => { if (data?.authenticated) { setAuth(data); try { localStorage.setItem('mp_auth', JSON.stringify(data)) } catch {}; fetchStores() } })
         }}
       />
     )
   }
 
-  // 🔄 LOADING
+  // 🔄 LOADING (only on first-ever visit with no cached session)
   if (auth === null) {
-    return (
-      <div className="loading-center" style={{ minHeight: '100dvh', background: 'var(--bg)' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" style={{ animation: 'spin 0.9s linear infinite' }}>
-            <circle cx="16" cy="16" r="13" stroke="var(--border)" strokeWidth="2"/>
-            <path d="M16 3a13 13 0 0113 13" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontFamily: 'var(--font-body)' }}>
-            Loading
-          </span>
-        </div>
-      </div>
-    )
+    return <div style={{ minHeight: '100dvh', background: 'var(--bg)' }} />
   }
 
   // 🔐 AUTH FLOW
@@ -350,7 +348,7 @@ export default function App() {
         <LoginPage
           onSwitch={() => { setOnboardingStep('account'); setAuthMode('onboarding') }}
           onNeedsShopify={() => { setOnboardingStep('connect'); setAuthMode('onboarding') }}
-          onLogin={(user) => { setAuth(user); fetchStores() }}
+          onLogin={(user) => { setAuth(user); try { localStorage.setItem('mp_auth', JSON.stringify(user)) } catch {}; fetchStores() }}
         />
       )
     }

@@ -55,15 +55,15 @@ const STEPS = ['account', 'platforms', 'connect', 'done']
 const STEP_LABELS = ['Account', 'Platforms', 'Connect', 'Done']
 
 const c = {
-  bg: '#0a0e1a',
-  surface: '#111827',
-  surface2: '#1a2235',
-  surface3: '#1f2d45',
-  border: 'rgba(255,255,255,0.07)',
-  text: '#e8eaf0',
-  muted: '#6b7a99',
-  accent: '#3b82f6',
-  red: '#ef4444',
+  bg: 'var(--bg)',
+  surface: 'var(--surface)',
+  surface2: 'var(--surface-raised)',
+  surface3: 'var(--surface-raised)',
+  border: 'var(--border)',
+  text: 'var(--text-primary)',
+  muted: 'var(--text-muted)',
+  accent: 'var(--accent)',
+  red: 'var(--red)',
 }
 
 function Label({ children }) {
@@ -239,7 +239,7 @@ function PlatformStep({ onNext, onBack }) {
           const sel = selected.includes(p.id)
           return (
             <button key={p.id} onClick={() => toggle(p.id, p.supported)} style={{
-              background: sel ? 'rgba(59,130,246,0.08)' : c.surface2,
+              background: sel ? 'var(--accent-subtle)' : c.surface2,
               border: `1px solid ${sel ? c.accent : c.border}`,
               borderRadius: '10px', padding: '14px 12px', textAlign: 'left',
               cursor: p.supported ? 'pointer' : 'not-allowed',
@@ -356,7 +356,7 @@ function DoneStep({ userData, onComplete }) {
   const firstName = userData?.user?.name?.trim().split(' ')[0] || ''
   return (
     <div style={{ textAlign: 'center' }}>
-      <div style={{ width: 54, height: 54, borderRadius: '50%', background: 'rgba(59,130,246,0.1)', border: `2px solid ${c.accent}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.4rem' }}>
+      <div style={{ width: 54, height: 54, borderRadius: '50%', background: 'var(--accent-subtle)', border: `2px solid ${c.accent}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.4rem' }}>
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
           <path d="M4.5 11l4.5 4.5 8.5-9" stroke={c.accent} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
@@ -401,7 +401,7 @@ export default function OnboardingFlow({ initialStep = 'account', onSwitch, onCo
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem', fontFamily: 'var(--font-body)' }}>
       <div style={{ width: '100%', maxWidth: 456 }}>
 
         {/* Brand — matches sidebar exactly */}

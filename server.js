@@ -473,7 +473,7 @@ app.post("/api/login", async (req, res) => {
       req.session.shop = store.shopDomain;
       return res.json({ authenticated: true, shop: store.shopDomain, shopName: store.shopName, lastProductsSyncAt: store.lastProductsSyncAt, lastOrdersSyncAt: store.lastOrdersSyncAt, plan: user.plan || "free", role: user.role || "user", emailVerified: user.emailVerified, email: user.email });
     }
-    res.json({ authenticated: false, needsShopify: true });
+    res.json({ authenticated: true, needsStore: true, plan: user.plan || 'free', role: user.role || 'user', emailVerified: user.emailVerified, email: user.email });
   } catch (e) {
     console.error("Login error:", e.message, e.code || "", e.stack?.split("\n")[1] || "");
     if (e.code === "P2021") {
