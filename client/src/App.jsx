@@ -1,0 +1,199 @@
+import { createContext, useContext, useEffect, useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import api from './api.js';
+import Sidebar from './components/Sidebar.jsx';
+import Header from './components/Header.jsx';
+import { LoadingSpinner } from './components/UI.jsx';
+
+import LoginPage from './pages/LoginPage.jsx';
+import OnboardingFlow from './pages/OnboardingFlow.jsx';
+import DashboardPage from './pages/DashboardPage.jsx';
+import ProductsPage from './pages/ProductsPage.jsx';
+import RecommendationsPage from './pages/RecommendationsPage.jsx';
+import InventoryPage from './pages/InventoryPage.jsx';
+import DealsPage from './pages/DealsPage.jsx';
+import AIPage from './pages/AIPage.jsx';
+import SettingsPage from './pages/SettingsPage.jsx';
+import PricingPage from './pages/PricingPage.jsx';
+import StoreErrorPage from './pages/StoreErrorPage.jsx';
+import PaymentSuccessPage from './pages/PaymentSuccessPage.jsx';
+import VerifyEmailPage from './pages/VerifyEmailPage.jsx';
+import TermsPage from './pages/TermsPage.jsx';
+import PrivacyPage from './pages/PrivacyPage.jsx';
+
+/* ─── Auth Context ─── */
+export const AuthContext = createContext(null);
+export const useAuth = () => useContext(AuthContext);
+
+function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [store, setStore] = useState(null);
+  const [stores, setStores] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+
+  const refresh = async () => {
+    try {
+      const data = await api.get('/api/me');
+      setUser(data.user || null);
+      setStore(data.store || null);
+      if (data.store) setStores(prev => {
+        const already = prev.find(s => s.id === data.store.id);
+        if (!already) return [data.store, ...prev];
+        return prev;
+      });
+    } catch {
+      setUser(null);
+      setStore(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { refresh(); }, []);
+
+  const sync = async () => {
+    setSyncing(true);
+    try {
+      await api.post('/api/sync/all');
+      await refresh();
+    } catch {
+      // handled per-page
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const switchStore = async (storeId) => {
+    try {
+      await api.post('/api/stores/switch', { storeId });
+      await refresh();
+    } catch {
+      // ignore
+    }
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, store, stores, loading, syncing, refresh, sync, switchStore }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+/* ─── Protected Route ─── */
+function ProtectedRoute({ children, requireAdmin }) {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <LoadingSpinner size={28} />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (requireAdmin && user.role !== 'admin') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+}
+
+/* ─── App Shell (authenticated layout) ─── */
+function AppShell({ children }) {
+  const { user, store, stores, syncing, sync, switchStore } = useAuth();
+
+  return (
+    <div className="app-shell">
+      <Sidebar user={user} stores={stores} activeStore={store} onSwitchStore={switchStore} />
+      <div className="app-content">
+        <Header user={user} store={store} onSync={sync} syncing={syncing} />
+        <div style={{ animation: 'fadeUp 0.2s ease both' }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Root Redirect ─── */
+function RootRedirect() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <LoadingSpinner size={28} />
+      </div>
+    );
+  }
+
+  return user ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
+}
+
+/* ─── Router ─── */
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          {/* Public */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/onboarding" element={<OnboardingFlow />} />
+          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/payment-success" element={<PaymentSuccessPage />} />
+          <Route path="/store-error" element={<StoreErrorPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+
+          {/* Protected */}
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <AppShell><DashboardPage /></AppShell>
+            </ProtectedRoute>
+          } />
+          <Route path="/products" element={
+            <ProtectedRoute>
+              <AppShell><ProductsPage /></AppShell>
+            </ProtectedRoute>
+          } />
+          <Route path="/recommendations" element={
+            <ProtectedRoute>
+              <AppShell><RecommendationsPage /></AppShell>
+            </ProtectedRoute>
+          } />
+          <Route path="/inventory" element={
+            <ProtectedRoute>
+              <AppShell><InventoryPage /></AppShell>
+            </ProtectedRoute>
+          } />
+          <Route path="/deals" element={
+            <ProtectedRoute>
+              <AppShell><DealsPage /></AppShell>
+            </ProtectedRoute>
+          } />
+          <Route path="/ai" element={
+            <ProtectedRoute>
+              <AppShell><AIPage /></AppShell>
+            </ProtectedRoute>
+          } />
+          <Route path="/settings" element={
+            <ProtectedRoute>
+              <AppShell><SettingsPage /></AppShell>
+            </ProtectedRoute>
+          } />
+
+          {/* Root */}
+          <Route path="/" element={<RootRedirect />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}
