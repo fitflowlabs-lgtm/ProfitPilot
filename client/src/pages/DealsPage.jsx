@@ -106,11 +106,32 @@ function ResultPanel({ results, loading, isPro }) {
   );
 }
 
+// Deal types: effective discount % for simulation
+const DEAL_TYPES = [
+  { id: 'pct_off', label: 'Percentage off', description: 'e.g. 20% off everything' },
+  { id: 'bogof', label: 'BOGOF', description: 'Buy one, get one free (50% eff.)' },
+  { id: 'bogo_half', label: 'BOGO 50% off', description: 'Buy one, get one half price (25% eff.)' },
+  { id: 'bogo_third', label: 'Buy 2 get 1 free', description: 'Buy two, get one free (33% eff.)' },
+  { id: 'fixed', label: 'Fixed amount off', description: 'e.g. $5 off each item' },
+];
+
+function effectiveDiscount(dealType, pctValue, fixedValue, price) {
+  switch (dealType) {
+    case 'bogof': return 50;
+    case 'bogo_half': return 25;
+    case 'bogo_third': return 33.3;
+    case 'fixed': return price > 0 ? Math.min(99, (fixedValue / price) * 100) : pctValue;
+    default: return pctValue;
+  }
+}
+
 export default function DealsPage() {
   const { user } = useAuth();
   const [products, setProducts] = useState([]);
   const [selected, setSelected] = useState([]);
+  const [dealType, setDealType] = useState('pct_off');
   const [discount, setDiscount] = useState(15);
+  const [fixedAmount, setFixedAmount] = useState(5);
   const [duration, setDuration] = useState(7);
   const [loading, setLoading] = useState(false);
   const [productsLoading, setProductsLoading] = useState(true);
@@ -141,13 +162,16 @@ export default function DealsPage() {
   const handleSimulate = async (e) => {
     e.preventDefault();
     if (selected.length === 0) { setError('Select at least one product.'); return; }
+    // Compute effective discount per selected product (use first product price for fixed)
+    const firstProduct = products.find(p => selected.includes(p.id));
+    const effDiscount = effectiveDiscount(dealType, discount, fixedAmount, firstProduct?.price || 50);
     setLoading(true);
     setError('');
     setResults(null);
     try {
       const data = await api.post('/api/deals/simulate', {
         variantIds: selected,
-        discountPercent: discount,
+        discountPercent: effDiscount,
         durationDays: duration,
       });
       setResults(data);
@@ -177,24 +201,43 @@ export default function DealsPage() {
           <form onSubmit={handleSimulate} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div className="font-display" style={{ fontSize: '15px', fontWeight: 700 }}>Deal parameters</div>
 
-            {/* Discount */}
+            {/* Deal type */}
             <div>
-              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>
-                Discount %
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <input
-                  type="range"
-                  min={5}
-                  max={60}
-                  step={5}
-                  value={discount}
-                  onChange={e => setDiscount(Number(e.target.value))}
-                  style={{ flex: 1, accentColor: 'var(--accent)' }}
-                />
-                <span className="mono" style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent)', minWidth: 44 }}>{discount}%</span>
+              <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Deal type</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {DEAL_TYPES.map(dt => (
+                  <label key={dt.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 7, border: `1px solid ${dealType === dt.id ? 'var(--accent-border)' : 'var(--border)'}`, background: dealType === dt.id ? 'var(--accent-subtle)' : 'var(--surface)', cursor: 'pointer', transition: 'var(--transition)' }}>
+                    <input type="radio" name="dealType" value={dt.id} checked={dealType === dt.id} onChange={() => setDealType(dt.id)} style={{ accentColor: 'var(--accent)' }} />
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: dealType === dt.id ? 'var(--accent)' : 'var(--text-primary)' }}>{dt.label}</div>
+                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>{dt.description}</div>
+                    </div>
+                  </label>
+                ))}
               </div>
             </div>
+
+            {/* Discount amount — only for pct_off */}
+            {dealType === 'pct_off' && (
+              <div>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Discount %</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <input type="range" min={5} max={60} step={5} value={discount} onChange={e => setDiscount(Number(e.target.value))} style={{ flex: 1, accentColor: 'var(--accent)' }} />
+                  <span className="mono" style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent)', minWidth: 44 }}>{discount}%</span>
+                </div>
+              </div>
+            )}
+
+            {/* Fixed amount */}
+            {dealType === 'fixed' && (
+              <div>
+                <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Amount off ($)</label>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>$</span>
+                  <input type="number" min={1} step={1} value={fixedAmount} onChange={e => setFixedAmount(Number(e.target.value))} style={{ width: '100%', padding: '9px 12px 9px 22px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: '14px', fontFamily: "'JetBrains Mono', monospace", outline: 'none' }} onFocus={e => e.target.style.borderColor = 'var(--accent)'} onBlur={e => e.target.style.borderColor = 'var(--border)'} />
+                </div>
+              </div>
+            )}
 
             {/* Duration */}
             <div>

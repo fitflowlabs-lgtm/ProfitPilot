@@ -9,10 +9,8 @@ import LoginPage from './pages/LoginPage.jsx';
 import OnboardingFlow from './pages/OnboardingFlow.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import ProductsPage from './pages/ProductsPage.jsx';
-import RecommendationsPage from './pages/RecommendationsPage.jsx';
 import InventoryPage from './pages/InventoryPage.jsx';
 import DealsPage from './pages/DealsPage.jsx';
-import AIPage from './pages/AIPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import PricingPage from './pages/PricingPage.jsx';
 import StoreErrorPage from './pages/StoreErrorPage.jsx';
@@ -51,17 +49,22 @@ function AuthProvider({ children }) {
             lastOrdersSyncAt: data.lastOrdersSyncAt,
           };
           setStore(storeObj);
-          setStores(prev => {
-            const already = prev.find(s => s.shopDomain === storeObj.shopDomain);
-            if (!already) return [storeObj, ...prev];
-            return prev;
-          });
         } else {
           setStore(null);
         }
+        // Load all stores for the switcher
+        try {
+          const sd = await api.get('/api/stores');
+          setStores((sd.stores || []).map(s => ({
+            shopDomain: s.shopDomain,
+            name: s.shopName || s.shopDomain,
+            lastProductsSyncAt: s.lastProductsSyncAt,
+          })));
+        } catch { /* ignore */ }
       } else {
         setUser(null);
         setStore(null);
+        setStores([]);
       }
     } catch {
       setUser(null);
@@ -85,13 +88,12 @@ function AuthProvider({ children }) {
     }
   };
 
-  const switchStore = async (storeId) => {
+  // server takes { shop: "domain" }
+  const switchStore = async (shopDomain) => {
     try {
-      await api.post('/api/stores/switch', { storeId });
+      await api.post('/api/stores/switch', { shop: shopDomain });
       await refresh();
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
   };
 
   return (
@@ -102,7 +104,7 @@ function AuthProvider({ children }) {
 }
 
 /* ─── Protected Route ─── */
-function ProtectedRoute({ children, requireAdmin }) {
+function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
   const location = useLocation();
 
@@ -118,14 +120,10 @@ function ProtectedRoute({ children, requireAdmin }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (requireAdmin && user.role !== 'admin') {
-    return <Navigate to="/dashboard" replace />;
-  }
-
   return children;
 }
 
-/* ─── App Shell (authenticated layout) ─── */
+/* ─── App Shell ─── */
 function AppShell({ children }) {
   const { user, store, stores, syncing, sync, switchStore } = useAuth();
 
@@ -145,7 +143,6 @@ function AppShell({ children }) {
 /* ─── Root Redirect ─── */
 function RootRedirect() {
   const { user, loading } = useAuth();
-
   if (loading) {
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -153,11 +150,9 @@ function RootRedirect() {
       </div>
     );
   }
-
   return user ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
 }
 
-/* ─── Router ─── */
 export default function App() {
   return (
     <BrowserRouter>
@@ -174,43 +169,16 @@ export default function App() {
           <Route path="/privacy" element={<PrivacyPage />} />
 
           {/* Protected */}
-          <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <AppShell><DashboardPage /></AppShell>
-            </ProtectedRoute>
-          } />
-          <Route path="/products" element={
-            <ProtectedRoute>
-              <AppShell><ProductsPage /></AppShell>
-            </ProtectedRoute>
-          } />
-          <Route path="/recommendations" element={
-            <ProtectedRoute>
-              <AppShell><RecommendationsPage /></AppShell>
-            </ProtectedRoute>
-          } />
-          <Route path="/inventory" element={
-            <ProtectedRoute>
-              <AppShell><InventoryPage /></AppShell>
-            </ProtectedRoute>
-          } />
-          <Route path="/deals" element={
-            <ProtectedRoute>
-              <AppShell><DealsPage /></AppShell>
-            </ProtectedRoute>
-          } />
-          <Route path="/ai" element={
-            <ProtectedRoute>
-              <AppShell><AIPage /></AppShell>
-            </ProtectedRoute>
-          } />
-          <Route path="/settings" element={
-            <ProtectedRoute>
-              <AppShell><SettingsPage /></AppShell>
-            </ProtectedRoute>
-          } />
+          <Route path="/dashboard" element={<ProtectedRoute><AppShell><DashboardPage /></AppShell></ProtectedRoute>} />
+          <Route path="/products" element={<ProtectedRoute><AppShell><ProductsPage /></AppShell></ProtectedRoute>} />
+          <Route path="/inventory" element={<ProtectedRoute><AppShell><InventoryPage /></AppShell></ProtectedRoute>} />
+          <Route path="/deals" element={<ProtectedRoute><AppShell><DealsPage /></AppShell></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><AppShell><SettingsPage /></AppShell></ProtectedRoute>} />
 
-          {/* Root */}
+          {/* Consolidate old routes */}
+          <Route path="/recommendations" element={<Navigate to="/products?tab=recommendations" replace />} />
+          <Route path="/ai" element={<Navigate to="/products?tab=products" replace />} />
+
           <Route path="/" element={<RootRedirect />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

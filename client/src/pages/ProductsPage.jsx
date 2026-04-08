@@ -1,181 +1,457 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../api.js';
+import { useAuth } from '../App.jsx';
 import {
   Button, Alert, StatusBadge, Table, EmptyState, FilterChips,
-  SearchInput, InlineEditCell, PageHeader, formatCurrency, formatPercent,
-  marginStatus, MarginBar
+  SearchInput, PageHeader, Tabs, formatCurrency, formatPercent,
+  marginColor, marginStatus, MarginBar, Skeleton, Badge, Card
 } from '../components/UI.jsx';
-import { useAuth } from '../App.jsx';
 
-export default function ProductsPage({ embedded }) {
-  const { sync, syncing } = useAuth();
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+/* ─── Helpers ─── */
+const ANALYSIS_KEY = 'mp_ai_analysis';
+
+function loadSavedAnalyses() {
+  try { return JSON.parse(localStorage.getItem(ANALYSIS_KEY) || '{}'); } catch { return {}; }
+}
+
+function saveAnalysis(variantId, text) {
+  const all = loadSavedAnalyses();
+  all[variantId] = { text, savedAt: Date.now() };
+  localStorage.setItem(ANALYSIS_KEY, JSON.stringify(all));
+}
+
+function timeAgo(ts) {
+  if (!ts) return null;
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+/* ─── Cost Edit Modal ─── */
+function CostEditModal({ product, onSave, onClose }) {
+  const [cost, setCost] = useState(product.cost != null ? String(product.cost) : '');
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('all');
-  const [saving, setSaving] = useState({});
-  const [successMsg, setSuccessMsg] = useState('');
+  const inputRef = useRef(null);
 
-  const load = async () => {
-    setLoading(true);
+  useEffect(() => {
+    if (inputRef.current) inputRef.current.focus();
+  }, []);
+
+  const targetCost60 = product.price ? (product.price * 0.4).toFixed(2) : null;
+  const previewMargin = cost && product.price > 0
+    ? (((product.price - parseFloat(cost)) / product.price) * 100).toFixed(1)
+    : null;
+
+  const handleSave = async () => {
+    const num = parseFloat(cost);
+    if (isNaN(num) || num < 0) { setError('Enter a valid cost.'); return; }
+    if (num >= product.price) { setError(`Cost can't be ≥ price (${formatCurrency(product.price)}).`); return; }
+    setSaving(true);
     try {
-      const data = await api.get('/api/products');
-      setProducts(data.variants || data.products || data || []);
-    } catch (err) {
-      setError(err.message);
+      await onSave(num);
+      onClose();
+    } catch (e) {
+      setError(e.message);
+      setSaving(false);
+    }
+  };
+
+  const mc = previewMargin != null ? marginColor(parseFloat(previewMargin)) : null;
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(26,20,10,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 24, animation: 'fadeIn 0.15s ease' }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--surface)', borderRadius: 'var(--radius-xl)', width: '100%', maxWidth: 380, boxShadow: 'var(--shadow-lg)', animation: 'fadeUp 0.2s ease' }}>
+        <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div className="font-display" style={{ fontSize: '15px', fontWeight: 700 }}>Set cost</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 2, maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {product.productTitle}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 20, padding: '0 2px' }}>×</button>
+        </div>
+        <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {error && <div style={{ padding: '8px 12px', borderRadius: 6, background: 'var(--red-bg)', border: '1px solid var(--red-border)', fontSize: '13px', color: 'var(--red)' }}>{error}</div>}
+
+          <div style={{ display: 'flex', gap: 12, padding: '10px 12px', borderRadius: 8, background: 'var(--surface-raised)', border: '1px solid var(--border)' }}>
+            <div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 2 }}>Current price</div>
+              <div className="mono" style={{ fontSize: '15px', fontWeight: 600 }}>{formatCurrency(product.price)}</div>
+            </div>
+            {targetCost60 && (
+              <div style={{ borderLeft: '1px solid var(--border)', paddingLeft: 12 }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 2 }}>Max cost for 60% margin</div>
+                <div className="mono" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--green)' }}>{formatCurrency(parseFloat(targetCost60))}</div>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 5 }}>
+              Cost of goods (COGS)
+            </label>
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '14px', fontWeight: 500 }}>$</span>
+              <input
+                ref={inputRef}
+                type="number"
+                step="0.01"
+                min="0"
+                value={cost}
+                onChange={e => { setCost(e.target.value); setError(''); }}
+                onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') onClose(); }}
+                placeholder="0.00"
+                style={{ width: '100%', padding: '9px 12px 9px 24px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: '15px', fontFamily: "'JetBrains Mono', monospace", outline: 'none', boxShadow: '0 0 0 3px var(--accent-subtle)', borderColor: 'var(--accent)' }}
+              />
+            </div>
+          </div>
+
+          {previewMargin != null && (
+            <div style={{ padding: '10px 12px', borderRadius: 8, background: mc === 'var(--green)' ? 'var(--green-bg)' : mc === 'var(--yellow)' ? 'var(--yellow-bg)' : 'var(--red-bg)', border: `1px solid ${mc === 'var(--green)' ? 'var(--green-border)' : mc === 'var(--yellow)' ? 'var(--yellow-border)' : 'var(--red-border)'}` }}>
+              <span style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>Margin at this cost: </span>
+              <span className="mono" style={{ fontSize: '13px', fontWeight: 700, color: mc }}>{previewMargin}%</span>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+            <Button variant="secondary" size="md" onClick={onClose} style={{ flex: 1 }}>Cancel</Button>
+            <Button size="md" loading={saving} onClick={handleSave} style={{ flex: 1 }}>Save cost</Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── AI Analysis Accordion ─── */
+function AIAnalysisRow({ variantId, productTitle, isPro, analyses, onAnalyzed }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [displayed, setDisplayed] = useState('');
+  const saved = analyses[variantId];
+  const timerRef = useRef(null);
+
+  const runAnalysis = async () => {
+    if (!isPro) { window.location.href = '/pricing'; return; }
+    setLoading(true);
+    setError('');
+    setDisplayed('');
+    try {
+      const data = await api.post(`/api/ai/product/${variantId}`);
+      const text = data.analysis || data.text || '';
+      saveAnalysis(variantId, text);
+      onAnalyzed(variantId, text);
+      typewrite(text);
+    } catch (e) {
+      setError(e.message || 'Analysis failed.');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(); }, []);
-
-  const handleSyncAndReload = async () => {
-    await sync();
-    await load();
+  const typewrite = (text) => {
+    let i = 0;
+    const tick = () => {
+      if (i <= text.length) {
+        setDisplayed(text.slice(0, i));
+        i++;
+        timerRef.current = setTimeout(tick, 10);
+      }
+    };
+    tick();
   };
 
-  const handleCostSave = async (variantId, cost) => {
-    setSaving(s => ({ ...s, [variantId]: true }));
-    try {
-      await api.put(`/api/products/${variantId}/cost`, { cost });
-      setProducts(prev => prev.map(p => p.id === variantId ? { ...p, cost, margin: cost > 0 ? ((p.price - cost) / p.price) * 100 : null } : p));
-      setSuccessMsg('Cost updated.');
-      setTimeout(() => setSuccessMsg(''), 2500);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(s => ({ ...s, [variantId]: false }));
+  useEffect(() => {
+    if (saved?.text && !displayed) {
+      setDisplayed(saved.text);
     }
+    return () => clearTimeout(timerRef.current);
+  }, []);
+
+  const textToShow = saved?.text || '';
+
+  return (
+    <div style={{ borderTop: '1px solid var(--border-subtle)', background: 'var(--surface-raised)' }}>
+      <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--accent-subtle)', border: '1px solid var(--accent-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M6.5 1.5l1 2.2 2.5.4-1.8 1.8.4 2.6L6.5 7.4l-2.1 1.1.4-2.6L3 4.1l2.5-.4 1-2.2z" stroke="var(--accent)" strokeWidth="1.2" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {error && <div style={{ fontSize: '13px', color: 'var(--red)', marginBottom: 8 }}>{error}</div>}
+          {loading && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {[1, 0.85, 0.7, 0.9].map((w, i) => (
+                <div key={i} style={{ height: 10, borderRadius: 4, background: 'linear-gradient(90deg, var(--surface-raised) 0%, var(--surface-hover) 50%, var(--surface-raised) 100%)', backgroundSize: '400px 100%', animation: 'shimmer 1.4s ease-in-out infinite', width: `${w * 100}%` }} />
+              ))}
+            </div>
+          )}
+          {!loading && textToShow && (
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+              {displayed || textToShow}
+            </div>
+          )}
+          {!loading && !textToShow && !error && (
+            <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+              {isPro ? 'Click Re-analyze to generate an AI analysis for this product.' : 'Upgrade to Pro to unlock per-product AI analysis.'}
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
+            <Button variant="secondary" size="sm" loading={loading} onClick={runAnalysis}>
+              {textToShow ? 'Re-analyze' : 'Analyze'}
+            </Button>
+            {saved?.savedAt && (
+              <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                Last analyzed: {timeAgo(saved.savedAt)}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Products Tab ─── */
+function ProductsTab({ products, loading, onCostSaved, saving, isPro }) {
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [costModal, setCostModal] = useState(null);
+  const [expandedAI, setExpandedAI] = useState({});
+  const [analyses, setAnalyses] = useState(loadSavedAnalyses);
+
+  const handleAnalyzed = (variantId, text) => {
+    setAnalyses(prev => ({ ...prev, [variantId]: { text, savedAt: Date.now() } }));
   };
 
-  // Filtered data
   const counts = {
     all: products.length,
-    healthy: products.filter(p => p.margin >= 60).length,
-    low: products.filter(p => p.margin >= 40 && p.margin < 60).length,
-    losing: products.filter(p => p.margin != null && p.margin < 40).length,
-    missing: products.filter(p => p.margin == null || p.cost == null).length,
+    healthy: products.filter(p => p.marginPercent >= 60).length,
+    low: products.filter(p => p.marginPercent >= 40 && p.marginPercent < 60).length,
+    losing: products.filter(p => p.marginPercent != null && p.marginPercent < 40).length,
+    missing: products.filter(p => p.cost == null).length,
   };
 
   const filtered = products.filter(p => {
     const q = search.toLowerCase();
-    const matchSearch = !q || p.productTitle?.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q);
+    const matchSearch = !q || p.productTitle?.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q);
     const matchFilter =
       filter === 'all' ? true :
-      filter === 'healthy' ? p.margin >= 60 :
-      filter === 'low' ? (p.margin >= 40 && p.margin < 60) :
-      filter === 'losing' ? (p.margin != null && p.margin < 40) :
-      filter === 'missing' ? (p.margin == null || p.cost == null) : true;
+      filter === 'healthy' ? p.marginPercent >= 60 :
+      filter === 'low' ? (p.marginPercent >= 40 && p.marginPercent < 60) :
+      filter === 'losing' ? (p.marginPercent != null && p.marginPercent < 40) :
+      filter === 'missing' ? p.cost == null : true;
     return matchSearch && matchFilter;
   });
 
-  const columns = [
-    {
-      key: 'product',
-      header: 'Product',
-      skeletonWidth: '80%',
-      render: (row) => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
-            {row.productTitle || row.title || 'Unnamed product'}
-          </span>
-          {row.variantTitle && row.variantTitle !== 'Default Title' && (
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{row.variantTitle}</span>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'sku',
-      header: 'SKU',
-      skeletonWidth: '60%',
-      render: (row) => (
-        <span className="mono" style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>
-          {row.sku || '—'}
-        </span>
-      ),
-    },
-    {
-      key: 'price',
-      header: 'Price',
-      align: 'right',
-      skeletonWidth: '50%',
-      render: (row) => (
-        <span className="mono" style={{ fontSize: '13.5px', fontWeight: 500 }}>
-          {formatCurrency(row.price)}
-        </span>
-      ),
-    },
-    {
-      key: 'cost',
-      header: 'Cost (COGS)',
-      align: 'right',
-      skeletonWidth: '50%',
-      render: (row) => (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-          {saving[row.id] ? (
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Saving…</span>
-          ) : (
-            <InlineEditCell
-              value={row.cost}
-              onSave={v => handleCostSave(row.id, v)}
-              format={formatCurrency}
-              placeholder="Set cost"
-            />
-          )}
-        </div>
-      ),
-    },
-    {
-      key: 'margin',
-      header: 'Margin',
-      skeletonWidth: '70%',
-      render: (row) => {
-        if (row.cost == null) return <span style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>—</span>;
-        return <MarginBar pct={row.margin} />;
-      },
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      skeletonWidth: '60%',
-      render: (row) => (
-        <StatusBadge variant={row.cost == null ? 'missing_cost' : marginStatus(row.margin)} />
-      ),
-    },
-    {
-      key: 'inventory',
-      header: 'Stock',
-      align: 'right',
-      skeletonWidth: '40%',
-      render: (row) => (
-        <span className="mono" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-          {row.inventoryQuantity ?? '—'}
-        </span>
-      ),
-    },
-  ];
-
   return (
-    <div className={embedded ? '' : 'page-content'}>
-      {!embedded && (
-        <PageHeader
-          title="Products"
-          subtitle="Manage costs and track margins across your catalog"
-          actions={
-            <Button variant="secondary" size="sm" loading={syncing} onClick={handleSyncAndReload}>
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                <path d="M11.5 2.5A5.5 5.5 0 0 0 1 6.5M1.5 10.5A5.5 5.5 0 0 0 12 6.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                <path d="M11 0.5v2.5H8.5M2 12.5v-2.5H4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Sync
-            </Button>
-          }
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search products or SKU…" />
+        <FilterChips
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { label: 'All', value: 'all', count: counts.all },
+            { label: 'Healthy', value: 'healthy', count: counts.healthy },
+            { label: 'Low margin', value: 'low', count: counts.low },
+            { label: 'Losing', value: 'losing', count: counts.losing },
+            { label: 'No cost', value: 'missing', count: counts.missing },
+          ]}
         />
+      </div>
+
+      {loading ? (
+        <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: 'var(--surface)' }}>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} style={{ padding: '14px 16px', borderBottom: i < 5 ? '1px solid var(--border-subtle)' : 'none', display: 'flex', gap: 16, alignItems: 'center' }}>
+              <Skeleton height={12} width="28%" />
+              <Skeleton height={12} width="12%" />
+              <Skeleton height={12} width="12%" />
+              <Skeleton height={12} width="12%" />
+              <Skeleton height={12} width="20%" />
+              <Skeleton height={12} width="10%" />
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <EmptyState icon="📦" title={search || filter !== 'all' ? 'No matching products' : 'No products yet'} description={search || filter !== 'all' ? 'Try adjusting your search or filter.' : 'Sync your store to import products.'} />
+      ) : (
+        <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: 'var(--surface)' }}>
+          {/* Table header */}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.2fr 1.5fr 1fr 80px', gap: 0, padding: '8px 16px', background: 'var(--surface-raised)', borderBottom: '1px solid var(--border)' }}>
+            {['Product', 'SKU', 'Price', 'Cost', 'Margin', 'Status', ''].map(h => (
+              <div key={h} style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{h}</div>
+            ))}
+          </div>
+          {filtered.map((p, i) => {
+            const isExpanded = expandedAI[p.id];
+            return (
+              <div key={p.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
+                <div
+                  style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.2fr 1.5fr 1fr 80px', gap: 0, padding: '11px 16px', transition: 'background 0.15s ease', cursor: 'default', alignItems: 'center' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-raised)'}
+                  onMouseLeave={e => e.currentTarget.style.background = ''}
+                >
+                  {/* Product name */}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.productTitle}</div>
+                    {p.variantTitle && p.variantTitle !== 'Default' && <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>{p.variantTitle}</div>}
+                  </div>
+                  {/* SKU */}
+                  <div className="mono" style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{p.sku || '—'}</div>
+                  {/* Price */}
+                  <div className="mono" style={{ fontSize: '13.5px', fontWeight: 500 }}>{formatCurrency(p.price)}</div>
+                  {/* Cost — click to edit */}
+                  <button
+                    onClick={() => setCostModal(p)}
+                    title="Click to edit cost"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 5, padding: '3px 6px', borderRadius: 5, transition: 'var(--transition)' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <span className="mono" style={{ fontSize: '13px', color: p.cost != null ? 'var(--text-primary)' : 'var(--text-muted)', borderBottom: '1px dashed var(--border)' }}>
+                      {p.cost != null ? formatCurrency(p.cost) : 'Set cost'}
+                    </span>
+                    <svg width="11" height="11" viewBox="0 0 11 11" fill="none" style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
+                      <path d="M1.5 9.5h2l5-5-2-2-5 5v2zM8 2l1 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  {/* Margin bar */}
+                  <div>{p.cost != null ? <MarginBar pct={p.marginPercent} width={100} /> : <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>—</span>}</div>
+                  {/* Status badge */}
+                  <div>
+                    <StatusBadge variant={p.cost == null ? 'missing_cost' : marginStatus(p.marginPercent)} />
+                  </div>
+                  {/* AI toggle */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => setExpandedAI(prev => ({ ...prev, [p.id]: !prev[p.id] }))}
+                      title="AI Analysis"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 4,
+                        padding: '4px 8px', borderRadius: 5, fontSize: '11.5px', fontWeight: 600,
+                        background: isExpanded ? 'var(--accent-subtle)' : 'transparent',
+                        border: isExpanded ? '1px solid var(--accent-border)' : '1px solid transparent',
+                        color: isExpanded ? 'var(--accent)' : analyses[p.id] ? 'var(--green)' : 'var(--text-muted)',
+                        cursor: 'pointer', transition: 'var(--transition)',
+                      }}
+                      onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = 'var(--surface-hover)'; }}
+                      onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M6 1.5l.8 1.7 1.9.3-1.4 1.3.3 1.9L6 5.8l-1.6.9.3-1.9L3.3 3.5l1.9-.3L6 1.5z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
+                        <path d="M2 10l1.2-.6M10 10l-1.2-.6M6 9v1.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+                      </svg>
+                      AI
+                    </button>
+                  </div>
+                </div>
+                {/* AI analysis row */}
+                {isExpanded && (
+                  <AIAnalysisRow
+                    variantId={p.id}
+                    productTitle={p.productTitle}
+                    isPro={isPro}
+                    analyses={analyses}
+                    onAnalyzed={handleAnalyzed}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
 
+      {!loading && filtered.length > 0 && (
+        <div style={{ marginTop: 8, fontSize: '12px', color: 'var(--text-muted)' }}>
+          {filtered.length} of {products.length} products · Click cost to edit · Click AI to analyze
+        </div>
+      )}
+
+      {costModal && (
+        <CostEditModal
+          product={costModal}
+          onSave={async (cost) => {
+            await onCostSaved(costModal.id, cost);
+          }}
+          onClose={() => setCostModal(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ─── Recommendations Tab ─── */
+function RecommendationsTab({ products, loading, isPro }) {
+  const [recs, setRecs] = useState([]);
+  const [recsLoading, setRecsLoading] = useState(true);
+  const [applying, setApplying] = useState({});
+  const [undoing, setUndoing] = useState({});
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const savedAnalyses = loadSavedAnalyses();
+
+  useEffect(() => {
+    const load = async () => {
+      setRecsLoading(true);
+      try {
+        const data = await api.get('/api/recommendations');
+        setRecs(data.recommendations || []);
+      } catch (e) {
+        setError(e.message);
+      } finally {
+        setRecsLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const handleApply = async (variantId, price) => {
+    setApplying(s => ({ ...s, [variantId]: true }));
+    try {
+      await api.post('/api/prices/apply', { variantId, price });
+      setRecs(prev => prev.map(r => r.variantId === variantId ? { ...r, applied: true } : r));
+      setSuccessMsg('Price applied.');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (e) { setError(e.message); }
+    finally { setApplying(s => ({ ...s, [variantId]: false })); }
+  };
+
+  const handleUndo = async (variantId) => {
+    setUndoing(s => ({ ...s, [variantId]: true }));
+    try {
+      await api.post(`/api/prices/undo/${variantId}`);
+      setRecs(prev => prev.map(r => r.variantId === variantId ? { ...r, applied: false } : r));
+      setSuccessMsg('Price restored.');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (e) { setError(e.message); }
+    finally { setUndoing(s => ({ ...s, [variantId]: false })); }
+  };
+
+  const handleApplyAll = async () => {
+    setBulkLoading(true);
+    try {
+      await api.post('/api/prices/apply-all');
+      setRecs(prev => prev.map(r => ({ ...r, applied: true })));
+      setSuccessMsg(`Applied all price changes.`);
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (e) { setError(e.message); }
+    finally { setBulkLoading(false); }
+  };
+
+  const pending = recs.filter(r => !r.applied && r.suggestedPrice);
+
+  return (
+    <div>
       {(error || successMsg) && (
         <div style={{ marginBottom: 14 }}>
           {error && <Alert type="error" message={error} onDismiss={() => setError('')} />}
@@ -183,50 +459,157 @@ export default function ProductsPage({ embedded }) {
         </div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <SearchInput value={search} onChange={setSearch} placeholder="Search products or SKU…" />
-          <FilterChips
-            value={filter}
-            onChange={setFilter}
-            options={[
-              { label: 'All', value: 'all', count: counts.all },
-              { label: 'Healthy', value: 'healthy', count: counts.healthy },
-              { label: 'Low', value: 'low', count: counts.low },
-              { label: 'Losing', value: 'losing', count: counts.losing },
-              { label: 'No cost', value: 'missing', count: counts.missing },
-            ]}
-          />
+      {pending.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <span style={{ fontSize: '13.5px', color: 'var(--text-secondary)' }}>
+            <span className="mono" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{pending.length}</span> product{pending.length !== 1 ? 's' : ''} need pricing attention
+          </span>
+          <Button size="sm" loading={bulkLoading} onClick={handleApplyAll}>Apply all {pending.length}</Button>
         </div>
-      </div>
+      )}
 
-      <Table
-        columns={columns}
-        data={filtered}
-        loading={loading}
-        rowKey="id"
-        emptyState={
-          <EmptyState
-            icon="📦"
-            title={search || filter !== 'all' ? 'No matching products' : 'No products synced yet'}
-            description={
-              search || filter !== 'all'
-                ? 'Try adjusting your search or filter.'
-                : 'Sync your Shopify store to import your product catalog.'
-            }
-            action={
-              !search && filter === 'all' ? (
-                <Button onClick={handleSyncAndReload} loading={syncing}>Sync products</Button>
-              ) : null
-            }
-          />
+      {recsLoading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[1,2,3,4].map(i => <Skeleton key={i} height={80} style={{ borderRadius: 10 }} />)}
+        </div>
+      ) : recs.length === 0 ? (
+        <EmptyState icon="✓" title="All products are optimally priced" description="Every product is hitting the 60% margin target." />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {recs.map(rec => {
+            const hasAI = !!savedAnalyses[rec.variantId];
+            const isUnusual = rec.unusualCost;
+            return (
+              <div
+                key={rec.variantId}
+                style={{ background: 'var(--surface)', border: `1px solid ${isUnusual ? 'var(--yellow-border)' : 'var(--border)'}`, borderRadius: 'var(--radius-lg)', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16, boxShadow: 'var(--shadow-sm)' }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                    <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rec.productTitle}</span>
+                    {isUnusual && <Badge color="yellow">Unusual cost</Badge>}
+                    {hasAI && <Badge color="accent">AI analyzed</Badge>}
+                  </div>
+                  {rec.sku && rec.sku !== 'Default' && <div className="mono" style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>{rec.sku}</div>}
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 4 }}>{rec.recommendation}</div>
+                </div>
+
+                {rec.suggestedPrice && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginBottom: 1 }}>Now</div>
+                      <div className="mono" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-secondary)', textDecoration: rec.applied ? 'line-through' : 'none', opacity: rec.applied ? 0.6 : 1 }}>{formatCurrency(rec.currentPrice)}</div>
+                      <div style={{ fontSize: '11px', color: marginColor(rec.currentMargin) }}>{rec.currentMargin != null ? formatPercent(rec.currentMargin) : 'No cost'}</div>
+                    </div>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                    <div>
+                      <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginBottom: 1 }}>Suggested</div>
+                      <div className="mono" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--accent)' }}>{formatCurrency(rec.suggestedPrice)}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--green)' }}>~60% margin</div>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ flexShrink: 0 }}>
+                  {rec.status === 'missing_cost' ? (
+                    <Badge color="neutral">Set cost first</Badge>
+                  ) : rec.applied ? (
+                    <Button variant="secondary" size="sm" loading={undoing[rec.variantId]} onClick={() => handleUndo(rec.variantId)}>Undo</Button>
+                  ) : rec.suggestedPrice ? (
+                    <Button size="sm" loading={applying[rec.variantId]} onClick={() => handleApply(rec.variantId, rec.suggestedPrice)}>Apply</Button>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Main ─── */
+export default function ProductsPage() {
+  const { user, sync, syncing } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState({});
+  const isPro = user?.plan === 'pro';
+
+  const tabFromUrl = searchParams.get('tab') || 'products';
+  const [tab, setTab] = useState(tabFromUrl === 'recommendations' ? 'recommendations' : 'products');
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const data = await api.get('/api/products');
+      setProducts(data.products || []);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleCostSaved = async (variantId, cost) => {
+    await api.put(`/api/products/${variantId}/cost`, { cost });
+    setProducts(prev => prev.map(p => {
+      if (p.id !== variantId) return p;
+      const marginPercent = p.price > 0 ? ((p.price - cost) / p.price) * 100 : null;
+      return { ...p, cost, marginPercent, status: marginStatus(marginPercent) };
+    }));
+  };
+
+  const handleSyncAndReload = async () => {
+    await sync();
+    await load();
+  };
+
+  const missingCost = products.filter(p => p.cost == null).length;
+  const recsCount = products.filter(p => p.cost != null && p.marginPercent < 60).length;
+
+  return (
+    <div className="page-content">
+      <PageHeader
+        title="Products"
+        subtitle="Manage costs, track margins, and optimize prices"
+        actions={
+          <Button variant="secondary" size="sm" loading={syncing} onClick={handleSyncAndReload}>
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M11.5 2.5A5.5 5.5 0 0 0 1 6.5M1.5 10.5A5.5 5.5 0 0 0 12 6.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              <path d="M11 0.5v2.5H8.5M2 12.5v-2.5H4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Sync
+          </Button>
         }
       />
 
-      {!loading && filtered.length > 0 && (
-        <div style={{ marginTop: 10, padding: '8px 4px', fontSize: '12px', color: 'var(--text-muted)' }}>
-          Showing {filtered.length} of {products.length} variants · Click a cost to edit it inline
-        </div>
+      {error && <div style={{ marginBottom: 14 }}><Alert type="error" message={error} onDismiss={() => setError('')} /></div>}
+
+      <Tabs
+        tabs={[
+          { id: 'products', label: 'Products', count: products.length },
+          { id: 'recommendations', label: 'Recommendations', count: recsCount || undefined },
+        ]}
+        activeTab={tab}
+        onChange={setTab}
+      />
+
+      {tab === 'products' && (
+        <ProductsTab
+          products={products}
+          loading={loading}
+          onCostSaved={handleCostSaved}
+          saving={saving}
+          isPro={isPro}
+        />
+      )}
+      {tab === 'recommendations' && (
+        <RecommendationsTab products={products} loading={loading} isPro={isPro} />
       )}
     </div>
   );
