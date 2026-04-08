@@ -122,10 +122,6 @@ function Step1({ onNext }) {
         {' '}and{' '}
         <Link to="/privacy" style={{ color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline' }}>Privacy Policy</Link>.
       </p>
-      <p style={{ textAlign: 'center', fontSize: '13px', color: 'var(--text-muted)' }}>
-        Already have an account?{' '}
-        <Link to="/login" style={{ color: 'var(--accent)', fontWeight: 600 }}>Sign in</Link>
-      </p>
     </form>
   );
 }
