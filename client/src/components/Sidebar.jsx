@@ -1,4 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import api from '../api.js';
 
 const icons = {
@@ -75,10 +76,20 @@ function StoreChip({ store, isActive, onSelect }) {
 
 export default function Sidebar({ user, stores, activeStore, onSwitchStore }) {
   const navigate = useNavigate();
+  const [addingStore, setAddingStore] = useState(false);
+  const [shopInput, setShopInput] = useState('');
 
   const handleLogout = async () => {
     try { await api.post('/api/logout'); } catch { /* ignore */ }
     navigate('/login');
+  };
+
+  const handleAddStore = (e) => {
+    e.preventDefault();
+    let domain = shopInput.trim().toLowerCase();
+    if (!domain) return;
+    if (!domain.includes('.')) domain = `${domain}.myshopify.com`;
+    window.location.href = `/auth?shop=${encodeURIComponent(domain)}`;
   };
 
   return (
@@ -117,14 +128,53 @@ export default function Sidebar({ user, stores, activeStore, onSwitchStore }) {
             onSelect={onSwitchStore}
           />
         ))}
-        <a
-          href="/auth"
-          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 10px', borderRadius: 6, fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500, textDecoration: 'none', marginTop: 3, transition: 'var(--transition)' }}
-          onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-subtle)'; }}
-          onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = ''; }}
-        >
-          {icons.plus} Add store
-        </a>
+        {addingStore ? (
+          <form onSubmit={handleAddStore} style={{ marginTop: 4, padding: '6px 4px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 5, fontWeight: 600, letterSpacing: '0.03em' }}>
+              Enter your Shopify domain
+            </div>
+            <input
+              autoFocus
+              value={shopInput}
+              onChange={e => setShopInput(e.target.value)}
+              placeholder="yourstore.myshopify.com"
+              style={{
+                width: '100%', padding: '6px 8px', borderRadius: 6,
+                border: '1px solid var(--border)', fontSize: '12px',
+                fontFamily: "'JetBrains Mono', monospace",
+                outline: 'none', background: 'var(--surface)',
+                color: 'var(--text-primary)', boxSizing: 'border-box',
+                marginBottom: 6,
+              }}
+              onFocus={e => e.target.style.borderColor = 'var(--accent)'}
+              onBlur={e => e.target.style.borderColor = 'var(--border)'}
+            />
+            <div style={{ display: 'flex', gap: 5 }}>
+              <button
+                type="submit"
+                style={{ flex: 1, padding: '5px 0', borderRadius: 5, background: 'var(--accent)', color: '#fff', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Connect
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAddingStore(false); setShopInput(''); }}
+                style={{ padding: '5px 10px', borderRadius: 5, background: 'var(--surface-raised)', color: 'var(--text-secondary)', border: '1px solid var(--border)', fontSize: '12px', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button
+            onClick={() => setAddingStore(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 10px', borderRadius: 6, fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500, background: 'none', border: 'none', width: '100%', textAlign: 'left', marginTop: 3, transition: 'var(--transition)', cursor: 'pointer' }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-subtle)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = ''; }}
+          >
+            {icons.plus} Add store
+          </button>
+        )}
       </div>
 
       {/* Navigation */}

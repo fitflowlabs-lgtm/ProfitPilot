@@ -31,8 +31,13 @@ function ResultPanel({ results, loading, isPro }) {
     );
   }
 
-  const revenueSign = results.estimatedRevenueDelta >= 0;
-  const profitSign = results.estimatedProfitDelta >= 0;
+  const summary = results.summary || {};
+  const rows = results.results || [];
+  const profitDelta = (summary.totalProjectedProfit || 0) - (summary.totalCurrentProfit || 0);
+  const profitSign = profitDelta >= 0;
+  const goodCount = summary.good || 0;
+  const riskyCount = summary.risky || 0;
+  const badCount = summary.bad || 0;
 
   return (
     <Card>
@@ -40,62 +45,53 @@ function ResultPanel({ results, loading, isPro }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
         <div style={{ padding: '14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-raised)' }}>
-          <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Revenue impact</div>
-          <div className="mono" style={{ fontSize: '20px', fontWeight: 700, color: revenueSign ? 'var(--green)' : 'var(--red)' }}>
-            {revenueSign ? '+' : ''}{formatCurrency(results.estimatedRevenueDelta)}
+          <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Current profit</div>
+          <div className="mono" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>
+            {formatCurrency(summary.totalCurrentProfit)}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 3 }}>
-            {formatPercent(results.estimatedRevenuePct)} change
-          </div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 3 }}>baseline</div>
         </div>
 
         <div style={{ padding: '14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface-raised)' }}>
-          <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Profit impact</div>
+          <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Projected profit</div>
           <div className="mono" style={{ fontSize: '20px', fontWeight: 700, color: profitSign ? 'var(--green)' : 'var(--red)' }}>
-            {profitSign ? '+' : ''}{formatCurrency(results.estimatedProfitDelta)}
+            {formatCurrency(summary.totalProjectedProfit)}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 3 }}>
-            Margin: {formatPercent(results.blendedMargin)}
+          <div style={{ fontSize: '12px', color: profitSign ? 'var(--green)' : 'var(--red)', marginTop: 3, fontWeight: 600 }}>
+            {profitSign ? '+' : ''}{formatCurrency(profitDelta)} vs baseline
           </div>
         </div>
       </div>
 
-      {/* Sales lift (AI/Pro) */}
-      {results.salesLiftPrediction != null ? (
-        <div style={{ padding: '14px', borderRadius: 10, border: '1px solid var(--accent-border)', background: 'var(--accent-subtle)', marginBottom: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <path d="M6.5 1.5l1 2.2 2.5.4-1.8 1.8.4 2.6L6.5 7.4l-2.1 1.1.4-2.6L3 4.1l2.5-.4 1-2.2z" stroke="var(--accent)" strokeWidth="1.2" strokeLinejoin="round" />
-            </svg>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>AI Sales Lift Prediction</span>
-          </div>
-          <div className="mono" style={{ fontSize: '22px', fontWeight: 700, color: 'var(--accent)', marginBottom: 4 }}>
-            +{formatPercent(results.salesLiftPrediction)}
-          </div>
-          {results.salesLiftReasoning && (
-            <div style={{ fontSize: '12.5px', color: 'var(--accent)', opacity: 0.8 }}>{results.salesLiftReasoning}</div>
-          )}
+      {/* Status counts */}
+      {(goodCount + riskyCount + badCount) > 0 && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          {goodCount > 0 && <Badge color="green">{goodCount} profitable</Badge>}
+          {riskyCount > 0 && <Badge color="yellow">{riskyCount} risky</Badge>}
+          {badCount > 0 && <Badge color="red">{badCount} unprofitable</Badge>}
         </div>
-      ) : isPro ? null : (
+      )}
+
+      {!isPro && (
         <div style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid var(--yellow-border)', background: 'var(--yellow-bg)', marginBottom: 16, fontSize: '13px', color: 'var(--yellow)', fontWeight: 500 }}>
           Upgrade to Pro for AI-powered sales lift predictions.
         </div>
       )}
 
       {/* Per-product breakdown */}
-      {results.products && results.products.length > 0 && (
+      {rows.length > 0 && (
         <div>
           <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>Product breakdown</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {results.products.map((p, i) => (
+            {rows.map((p, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '8px 10px', borderRadius: 7, background: 'var(--surface-raised)' }}>
                 <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {p.productTitle}
                 </span>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-                  <span className="mono" style={{ fontSize: '12.5px', textDecoration: 'line-through', color: 'var(--text-muted)' }}>{formatCurrency(p.originalPrice)}</span>
-                  <span className="mono" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--accent)' }}>{formatCurrency(p.dealPrice)}</span>
-                  <Badge color={p.dealMargin >= 60 ? 'green' : p.dealMargin >= 40 ? 'yellow' : 'red'}>{formatPercent(p.dealMargin)}</Badge>
+                  <span className="mono" style={{ fontSize: '12.5px', textDecoration: 'line-through', color: 'var(--text-muted)' }}>{formatCurrency(p.currentPrice)}</span>
+                  <span className="mono" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--accent)' }}>{formatCurrency(p.effectivePrice)}</span>
+                  <Badge color={p.newMarginPercent >= 50 ? 'green' : p.newMarginPercent >= 25 ? 'yellow' : 'red'}>{formatPercent(p.newMarginPercent)}</Badge>
                 </div>
               </div>
             ))}
@@ -159,20 +155,32 @@ export default function DealsPage() {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
+  const SERVER_DEAL_TYPE = {
+    pct_off: 'percent',
+    bogof: 'bogo_free',
+    bogo_half: 'bogo_percent',
+    bogo_third: 'bogo_percent',
+    fixed: 'fixed',
+  };
+  const SERVER_DISCOUNT_VALUE = {
+    pct_off: discount,
+    bogof: 0,
+    bogo_half: 50,
+    bogo_third: 33,
+    fixed: fixedAmount,
+  };
+
   const handleSimulate = async (e) => {
     e.preventDefault();
     if (selected.length === 0) { setError('Select at least one product.'); return; }
-    // Compute effective discount per selected product (use first product price for fixed)
-    const firstProduct = products.find(p => selected.includes(p.id));
-    const effDiscount = effectiveDiscount(dealType, discount, fixedAmount, firstProduct?.price || 50);
     setLoading(true);
     setError('');
     setResults(null);
     try {
       const data = await api.post('/api/deals/simulate', {
         variantIds: selected,
-        discountPercent: effDiscount,
-        durationDays: duration,
+        dealType: SERVER_DEAL_TYPE[dealType] || 'percent',
+        discountValue: SERVER_DISCOUNT_VALUE[dealType] ?? discount,
       });
       setResults(data);
     } catch (err) {
