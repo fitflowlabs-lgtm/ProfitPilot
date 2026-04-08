@@ -116,6 +116,12 @@ function Step1({ onNext }) {
       <Button type="submit" loading={loading} size="lg" style={{ width: '100%', marginTop: 4 }}>
         Create account →
       </Button>
+      <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+        By creating an account you agree to our{' '}
+        <Link to="/terms" style={{ color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline' }}>Terms of Service</Link>
+        {' '}and{' '}
+        <Link to="/privacy" style={{ color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline' }}>Privacy Policy</Link>.
+      </p>
       <p style={{ textAlign: 'center', fontSize: '13px', color: 'var(--text-muted)' }}>
         Already have an account?{' '}
         <Link to="/login" style={{ color: 'var(--accent)', fontWeight: 600 }}>Sign in</Link>
