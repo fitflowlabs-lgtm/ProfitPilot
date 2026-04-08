@@ -333,6 +333,18 @@ export default function OnboardingFlow() {
           {step === 1 && <Step2 onNext={() => setStep(2)} />}
           {step === 2 && <Step3 />}
         </div>
+
+        {step === 0 && (
+          <p style={{ textAlign: 'center', marginTop: 20, fontSize: '13.5px', color: 'var(--text-muted)' }}>
+            Already have an account?{' '}
+            <Link to="/login" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
+              onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+              onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+            >
+              Sign in
+            </Link>
+          </p>
+        )}
       </div>
     </div>
   );
