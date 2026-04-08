@@ -35,13 +35,34 @@ function AuthProvider({ children }) {
   const refresh = async () => {
     try {
       const data = await api.get('/api/me');
-      setUser(data.user || null);
-      setStore(data.store || null);
-      if (data.store) setStores(prev => {
-        const already = prev.find(s => s.id === data.store.id);
-        if (!already) return [data.store, ...prev];
-        return prev;
-      });
+      if (data.authenticated) {
+        setUser({
+          email: data.email || null,
+          name: data.name || null,
+          plan: data.plan || 'free',
+          role: data.role || 'user',
+          emailVerified: data.emailVerified ?? true,
+        });
+        if (data.shop) {
+          const storeObj = {
+            shopDomain: data.shop,
+            name: data.shopName || data.shop,
+            lastProductsSyncAt: data.lastProductsSyncAt,
+            lastOrdersSyncAt: data.lastOrdersSyncAt,
+          };
+          setStore(storeObj);
+          setStores(prev => {
+            const already = prev.find(s => s.shopDomain === storeObj.shopDomain);
+            if (!already) return [storeObj, ...prev];
+            return prev;
+          });
+        } else {
+          setStore(null);
+        }
+      } else {
+        setUser(null);
+        setStore(null);
+      }
     } catch {
       setUser(null);
       setStore(null);
