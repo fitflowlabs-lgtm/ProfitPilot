@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../api.js';
+import { useAuth } from '../App.jsx';
 import { Button, Alert } from '../components/UI.jsx';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { refresh } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -16,6 +18,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await api.post('/api/login', { email, password });
+      await refresh();
       navigate('/dashboard');
     } catch (err) {
       setError(err.message || 'Invalid email or password.');
