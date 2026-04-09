@@ -520,6 +520,8 @@ export function FilterChips({ options, value, onChange }) {
               background: isActive ? 'var(--accent-subtle)' : 'var(--surface)',
               color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
             }}
+            onMouseEnter={e => { if (!isActive) { e.currentTarget.style.borderColor = 'var(--accent-border)'; e.currentTarget.style.color = 'var(--text-primary)'; } }}
+            onMouseLeave={e => { if (!isActive) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)'; } }}
           >
             {opt.label}
             {opt.count !== undefined && <span style={{ marginLeft: 4, opacity: 0.65 }}>{opt.count}</span>}
@@ -557,8 +559,8 @@ export function SearchInput({ value, onChange, placeholder = 'Search…' }) {
           width: 240,
           transition: 'var(--transition)',
         }}
-        onFocus={e => e.target.style.borderColor = 'var(--accent)'}
-        onBlur={e => e.target.style.borderColor = 'var(--border)'}
+        onFocus={e => { e.target.style.borderColor = 'var(--accent)'; e.target.style.boxShadow = '0 0 0 3px var(--accent-subtle)'; }}
+        onBlur={e => { e.target.style.borderColor = 'var(--border)'; e.target.style.boxShadow = 'none'; }}
       />
     </div>
   );

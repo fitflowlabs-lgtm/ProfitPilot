@@ -100,14 +100,15 @@ function CostEditModal({ product, onSave, onClose }) {
               <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: '14px', fontWeight: 500 }}>$</span>
               <input
                 ref={inputRef}
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 value={cost}
                 onChange={e => { setCost(e.target.value); setError(''); }}
                 onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') onClose(); }}
                 placeholder="0.00"
-                style={{ width: '100%', padding: '9px 12px 9px 24px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: '15px', fontFamily: "'JetBrains Mono', monospace", outline: 'none', boxShadow: '0 0 0 3px var(--accent-subtle)', borderColor: 'var(--accent)' }}
+                style={{ width: '100%', padding: '9px 12px 9px 24px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: '15px', fontFamily: "'JetBrains Mono', monospace", outline: 'none', transition: 'var(--transition)' }}
+                onFocus={e => { e.target.style.borderColor = 'var(--accent)'; e.target.style.boxShadow = '0 0 0 3px var(--accent-subtle)'; }}
+                onBlur={e => { e.target.style.borderColor = 'var(--border)'; e.target.style.boxShadow = 'none'; }}
               />
             </div>
           </div>
@@ -177,40 +178,86 @@ function AIAnalysisRow({ variantId, productTitle, isPro, analyses, onAnalyzed })
   const textToShow = saved?.text || '';
 
   return (
-    <div style={{ borderTop: '1px solid var(--border-subtle)', background: 'var(--surface-raised)' }}>
-      <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-        <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--accent-subtle)', border: '1px solid var(--accent-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <path d="M6.5 1.5l1 2.2 2.5.4-1.8 1.8.4 2.6L6.5 7.4l-2.1 1.1.4-2.6L3 4.1l2.5-.4 1-2.2z" stroke="var(--accent)" strokeWidth="1.2" strokeLinejoin="round" />
-          </svg>
-        </div>
+    <div style={{ borderTop: '2px solid var(--accent-border)', background: 'linear-gradient(to right, rgba(26,92,56,0.04), transparent 60%)', animation: 'fadeIn 0.2s ease' }}>
+      <div style={{ padding: '16px 18px 16px 16px', display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+        {/* Left accent strip */}
+        <div style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, background: 'var(--accent)', flexShrink: 0, opacity: 0.5 }} />
+
         <div style={{ flex: 1, minWidth: 0 }}>
-          {error && <div style={{ fontSize: '13px', color: 'var(--red)', marginBottom: 8 }}>{error}</div>}
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <div style={{ width: 22, height: 22, borderRadius: 6, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                <path d="M5.5 1l.8 1.8 2 .3-1.4 1.4.3 2L5.5 5.6 4 6.5l.3-2L2.9 3.1l2-.3L5.5 1z" fill="white" fillOpacity="0.9" />
+              </svg>
+            </div>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              AI Analysis
+            </span>
+            {saved?.savedAt && (
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: 4 }}>
+                · saved {timeAgo(saved.savedAt)}
+              </span>
+            )}
+          </div>
+
+          {error && <div style={{ fontSize: '13px', color: 'var(--red)', marginBottom: 10, padding: '7px 10px', background: 'var(--red-bg)', borderRadius: 6, border: '1px solid var(--red-border)' }}>{error}</div>}
+
           {loading && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-              {[1, 0.85, 0.7, 0.9].map((w, i) => (
-                <div key={i} style={{ height: 10, borderRadius: 4, background: 'linear-gradient(90deg, var(--surface-raised) 0%, var(--surface-hover) 50%, var(--surface-raised) 100%)', backgroundSize: '400px 100%', animation: 'shimmer 1.4s ease-in-out infinite', width: `${w * 100}%` }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+              {[1, 0.82, 0.68, 0.9, 0.55].map((w, i) => (
+                <div key={i} style={{ height: 11, borderRadius: 4, background: 'linear-gradient(90deg, rgba(26,92,56,0.06) 0%, rgba(26,92,56,0.12) 50%, rgba(26,92,56,0.06) 100%)', backgroundSize: '400px 100%', animation: 'shimmer 1.4s ease-in-out infinite', width: `${w * 100}%` }} />
               ))}
             </div>
           )}
+
           {!loading && textToShow && (
-            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+            <div style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: 1.75, whiteSpace: 'pre-wrap', marginBottom: 12 }}>
               {displayed || textToShow}
+              {displayed && displayed.length < textToShow.length && (
+                <span style={{ display: 'inline-block', width: 2, height: 13, background: 'var(--accent)', marginLeft: 2, verticalAlign: 'text-bottom', animation: 'blink 1s step-end infinite' }} />
+              )}
             </div>
           )}
+
           {!loading && !textToShow && !error && (
-            <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-              {isPro ? 'Click Re-analyze to generate an AI analysis for this product.' : 'Upgrade to Pro to unlock per-product AI analysis.'}
+            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.6 }}>
+              {isPro
+                ? 'Get an AI-powered breakdown of this product\'s profitability, suggested pricing, and cost reduction opportunities.'
+                : 'Upgrade to Pro to unlock per-product AI analysis — pricing recommendations, profitability insights, and more.'}
             </div>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
-            <Button variant="secondary" size="sm" loading={loading} onClick={runAnalysis}>
-              {textToShow ? 'Re-analyze' : 'Analyze'}
-            </Button>
-            {saved?.savedAt && (
-              <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
-                Last analyzed: {timeAgo(saved.savedAt)}
-              </span>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {isPro ? (
+              <button
+                onClick={runAnalysis}
+                disabled={loading}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '6px 14px', borderRadius: 6, fontSize: '13px', fontWeight: 600,
+                  background: loading ? 'var(--surface-raised)' : 'var(--accent)',
+                  color: loading ? 'var(--text-muted)' : '#fff',
+                  border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+                  transition: 'var(--transition)', fontFamily: "'Plus Jakarta Sans', sans-serif",
+                }}
+                onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'var(--accent-hover)'; }}
+                onMouseLeave={e => { if (!loading) e.currentTarget.style.background = 'var(--accent)'; }}
+              >
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                  <path d="M6 1l.8 1.8 2 .3-1.4 1.4.3 2L6 5.6 4.3 6.5l.3-2L3.2 3.1l2-.3L6 1z" fill="currentColor" fillOpacity="0.9" />
+                </svg>
+                {loading ? 'Analyzing…' : textToShow ? 'Re-analyze' : 'Analyze this product'}
+              </button>
+            ) : (
+              <button
+                onClick={() => window.location.href = '/pricing'}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 6, fontSize: '13px', fontWeight: 600, background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'var(--transition)' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'var(--accent-hover)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'var(--accent)'}
+              >
+                Upgrade to Pro
+              </button>
             )}
           </div>
         </div>
@@ -556,7 +603,7 @@ export default function ProductsPage() {
   useEffect(() => { load(); }, []);
 
   const handleCostSaved = async (variantId, cost) => {
-    await api.put(`/api/products/${variantId}/cost`, { cost });
+    await api.put(`/api/products/${variantId}/cost`, { cogs: cost });
     setProducts(prev => prev.map(p => {
       if (p.id !== variantId) return p;
       const marginPercent = p.price > 0 ? ((p.price - cost) / p.price) * 100 : null;
