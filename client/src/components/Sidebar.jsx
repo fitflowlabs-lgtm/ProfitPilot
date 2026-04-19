@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../api.js';
 
 const icons = {
@@ -13,6 +13,8 @@ const icons = {
   signout: <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M6 1.5H2a.5.5 0 0 0-.5.5v11a.5.5 0 0 0 .5.5h4M10 10.5l3-3-3-3M13 7.5H6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" /></svg>,
   shop: <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1.5 3.5h10l-1 5H2.5l-1-5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" /><circle cx="4.5" cy="11" r=".8" fill="currentColor" /><circle cx="8.5" cy="11" r=".8" fill="currentColor" /></svg>,
   plus: <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 2v9M2 6.5h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>,
+  chart: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 12l4-4 3 3 4-6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>,
+  menu: <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>,
 };
 
 function NavItem({ to, icon, label, end }) {
@@ -78,6 +80,15 @@ export default function Sidebar({ user, stores, activeStore, onSwitchStore }) {
   const navigate = useNavigate();
   const [addingStore, setAddingStore] = useState(false);
   const [shopInput, setShopInput] = useState('');
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   const handleLogout = async () => {
     try { await api.post('/api/logout'); } catch { /* ignore */ }
@@ -92,11 +103,56 @@ export default function Sidebar({ user, stores, activeStore, onSwitchStore }) {
     window.location.href = `/auth?shop=${encodeURIComponent(domain)}`;
   };
 
+  const closeMobile = () => setMobileOpen(false);
+
   return (
+    <>
+      {/* Mobile hamburger */}
+      {isMobile && (
+        <button
+          onClick={() => setMobileOpen(o => !o)}
+          aria-label="Open menu"
+          style={{
+            position: 'fixed',
+            top: 14,
+            left: 14,
+            zIndex: 200,
+            width: 36,
+            height: 36,
+            borderRadius: 8,
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: 'var(--shadow-lg)',
+            color: 'var(--text-primary)',
+          }}
+        >
+          {icons.menu}
+        </button>
+      )}
+
+      {/* Mobile backdrop */}
+      {isMobile && mobileOpen && (
+        <div
+          onClick={closeMobile}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 149,
+          }}
+        />
+      )}
+
     <aside style={{
       position: 'fixed', top: 0, left: 0, width: 'var(--sidebar-width)', height: '100vh',
       background: 'var(--surface)', borderRight: '1px solid var(--border)',
-      display: 'flex', flexDirection: 'column', zIndex: 100, overflowY: 'auto',
+      display: 'flex', flexDirection: 'column', zIndex: 150, overflowY: 'auto',
+      transform: isMobile && !mobileOpen ? 'translateX(-100%)' : 'translateX(0)',
+      transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)',
     }}>
       {/* Brand */}
       <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid var(--border-subtle)' }}>
@@ -178,13 +234,14 @@ export default function Sidebar({ user, stores, activeStore, onSwitchStore }) {
       </div>
 
       {/* Navigation */}
-      <nav style={{ flex: 1, padding: '8px 8px', overflowY: 'auto' }}>
+      <nav style={{ flex: 1, padding: '8px 8px', overflowY: 'auto' }} onClick={isMobile ? closeMobile : undefined}>
         <NavItem to="/dashboard" end icon={icons.home} label="Dashboard" />
 
         <SectionLabel>Analyze</SectionLabel>
         <NavItem to="/products" icon={icons.products} label="Products" />
         <NavItem to="/inventory" icon={icons.inventory} label="Inventory" />
         <NavItem to="/deals" icon={icons.deals} label="Deals" />
+        <NavItem to="/reports/profitability" icon={icons.chart} label="Profitability" />
 
         <SectionLabel>Account</SectionLabel>
         <NavItem to="/settings" icon={icons.settings} label="Settings" />
@@ -229,5 +286,6 @@ export default function Sidebar({ user, stores, activeStore, onSwitchStore }) {
         </button>
       </div>
     </aside>
+    </>
   );
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../api.js';
 import { useAuth } from '../App.jsx';
-import { Button, Alert, StatusBadge, Table, EmptyState, Modal, PageHeader, Skeleton, Badge } from '../components/UI.jsx';
+import { Button, Alert, StatusBadge, Table, EmptyState, Modal, PageHeader, Skeleton, Badge, FilterChips } from '../components/UI.jsx';
 
 // Server returns: { id, productTitle, sku, inventory, unitsSold30, dailySales, daysOfInventory, reorderQty, recommendation, status }
 function getStatusConfig(status) {
@@ -65,12 +65,34 @@ function AIInventoryModal({ variantId, productTitle, isOpen, onClose, isPro }) {
   );
 }
 
+function exportInventoryCSV(inventory) {
+  const header = 'Product,SKU,Qty,Sold 30d,Daily Rate,Days Left,Status';
+  const rows = inventory.map(r => [
+    `"${(r.productTitle || '').replace(/"/g, '""')}"`,
+    r.sku || '',
+    r.inventory ?? '',
+    r.unitsSold30 ?? '',
+    r.dailySales != null ? r.dailySales.toFixed(1) : '',
+    r.daysOfInventory != null ? r.daysOfInventory : '',
+    r.status || '',
+  ].join(','));
+  const csv = [header, ...rows].join('\n');
+  const date = new Date().toISOString().slice(0, 10);
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `margin-pilot-inventory-${date}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function InventoryPage() {
   const { user, sync, syncing } = useAuth();
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [aiModal, setAiModal] = useState(null);
+  const [inventoryFilter, setInventoryFilter] = useState('all');
   const isPro = user?.plan === 'pro';
 
   const load = async () => {
@@ -127,6 +149,13 @@ export default function InventoryPage() {
     {
       key: 'status', header: 'Status', skeletonWidth: '55%',
       render: r => {
+        if (r.deadStock) {
+          return (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              <StatusBadge custom={{ label: 'Dead stock', color: '#8B9BB4', bg: 'rgba(139,155,180,0.12)', border: 'rgba(139,155,180,0.3)' }} />
+            </div>
+          );
+        }
         const cfg = getStatusConfig(r.status);
         return <StatusBadge custom={cfg} />;
       },
@@ -134,15 +163,38 @@ export default function InventoryPage() {
     {
       key: 'actions', header: '', skeletonWidth: '25%',
       render: r => (
-        <Button variant="ghost" size="sm" onClick={() => setAiModal({ id: r.id, title: r.productTitle })} style={{ gap: 4, color: 'var(--text-muted)' }}>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M6 1.5l.8 1.7 1.9.3-1.4 1.3.3 1.9L6 5.8l-1.6.9.3-1.9L3.3 3.5l1.9-.3L6 1.5z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
-          </svg>
-          AI
-        </Button>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          {r.deadStock && r.cogs != null && (
+            <Button
+              variant="ghost"
+              size="sm"
+              title="Copy suggested clearance price"
+              onClick={() => {
+                const price = (r.cogs * 1.15).toFixed(2);
+                navigator.clipboard.writeText(price).catch(() => {});
+              }}
+              style={{ gap: 4, color: 'var(--text-muted)', fontSize: '11.5px' }}
+            >
+              Clearance
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={() => setAiModal({ id: r.id, title: r.productTitle })} style={{ gap: 4, color: 'var(--text-muted)' }}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M6 1.5l.8 1.7 1.9.3-1.4 1.3.3 1.9L6 5.8l-1.6.9.3-1.9L3.3 3.5l1.9-.3L6 1.5z" stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round" />
+            </svg>
+            AI
+          </Button>
+        </div>
       ),
     },
   ];
+
+  const deadStockItems = inventory.filter(i => i.deadStock);
+  const filteredInventory = inventory.filter(i => {
+    if (inventoryFilter === 'low') return i.status === 'low' || i.status === 'critical' || i.status === 'out';
+    if (inventoryFilter === 'dead') return i.deadStock;
+    return true;
+  });
 
   return (
     <div className="page-content">
@@ -150,13 +202,40 @@ export default function InventoryPage() {
         title="Inventory"
         subtitle="Stock levels, turnover rates, and reorder alerts"
         actions={
-          <Button variant="secondary" size="sm" loading={syncing} onClick={async () => { await sync(); load(); }}>
-            Sync
-          </Button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button variant="secondary" size="sm" onClick={() => exportInventoryCSV(inventory)}>
+              Export CSV
+            </Button>
+            <Button variant="secondary" size="sm" loading={syncing} onClick={async () => { await sync(); load(); }}>
+              Sync
+            </Button>
+          </div>
         }
       />
 
       {error && <div style={{ marginBottom: 16 }}><Alert type="error" message={error} onDismiss={() => setError('')} /></div>}
+
+      {/* Dead stock alert */}
+      {!loading && deadStockItems.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <Alert type="warning" message={`${deadStockItems.length} dead stock item${deadStockItems.length !== 1 ? 's' : ''} detected — products with no recent sales. Consider clearance pricing.`} />
+        </div>
+      )}
+
+      {/* Filter tabs */}
+      {!loading && (
+        <div style={{ marginBottom: 16 }}>
+          <FilterChips
+            value={inventoryFilter}
+            onChange={setInventoryFilter}
+            options={[
+              { label: 'All', value: 'all', count: inventory.length },
+              { label: 'Low stock', value: 'low', count: inventory.filter(i => i.status === 'low' || i.status === 'critical' || i.status === 'out').length },
+              { label: 'Dead stock', value: 'dead', count: deadStockItems.length },
+            ]}
+          />
+        </div>
+      )}
 
       {/* Critical alerts */}
       {!loading && critical.length > 0 && (
@@ -183,7 +262,7 @@ export default function InventoryPage() {
 
       <Table
         columns={columns}
-        data={inventory}
+        data={filteredInventory}
         loading={loading}
         rowKey="id"
         emptyState={

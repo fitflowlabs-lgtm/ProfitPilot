@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar.jsx';
 import Header from './components/Header.jsx';
 import { LoadingSpinner } from './components/UI.jsx';
 
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import OnboardingFlow from './pages/OnboardingFlow.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
@@ -18,6 +19,7 @@ import PaymentSuccessPage from './pages/PaymentSuccessPage.jsx';
 import VerifyEmailPage from './pages/VerifyEmailPage.jsx';
 import TermsPage from './pages/TermsPage.jsx';
 import PrivacyPage from './pages/PrivacyPage.jsx';
+import ProfitabilityPage from './pages/ProfitabilityPage.jsx';
 
 /* ─── Auth Context ─── */
 export const AuthContext = createContext(null);
@@ -126,14 +128,24 @@ function ProtectedRoute({ children }) {
 /* ─── App Shell ─── */
 function AppShell({ children }) {
   const { user, store, stores, syncing, sync, switchStore } = useAuth();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   return (
     <div className="app-shell">
       <Sidebar user={user} stores={stores} activeStore={store} onSwitchStore={switchStore} />
-      <div className="app-content">
+      <div className="app-content" style={isMobile ? { marginLeft: 0 } : {}}>
         <Header user={user} store={store} onSync={sync} syncing={syncing} />
         <div style={{ animation: 'fadeUp 0.2s ease both' }}>
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </div>
       </div>
     </div>
@@ -169,11 +181,12 @@ export default function App() {
           <Route path="/privacy" element={<PrivacyPage />} />
 
           {/* Protected */}
-          <Route path="/dashboard" element={<ProtectedRoute><AppShell><DashboardPage /></AppShell></ProtectedRoute>} />
-          <Route path="/products" element={<ProtectedRoute><AppShell><ProductsPage /></AppShell></ProtectedRoute>} />
-          <Route path="/inventory" element={<ProtectedRoute><AppShell><InventoryPage /></AppShell></ProtectedRoute>} />
-          <Route path="/deals" element={<ProtectedRoute><AppShell><DealsPage /></AppShell></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute><AppShell><SettingsPage /></AppShell></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute><AppShell><ErrorBoundary><DashboardPage /></ErrorBoundary></AppShell></ProtectedRoute>} />
+          <Route path="/products" element={<ProtectedRoute><AppShell><ErrorBoundary><ProductsPage /></ErrorBoundary></AppShell></ProtectedRoute>} />
+          <Route path="/inventory" element={<ProtectedRoute><AppShell><ErrorBoundary><InventoryPage /></ErrorBoundary></AppShell></ProtectedRoute>} />
+          <Route path="/deals" element={<ProtectedRoute><AppShell><ErrorBoundary><DealsPage /></ErrorBoundary></AppShell></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><AppShell><ErrorBoundary><SettingsPage /></ErrorBoundary></AppShell></ProtectedRoute>} />
+          <Route path="/reports/profitability" element={<ProtectedRoute><AppShell><ErrorBoundary><ProfitabilityPage /></ErrorBoundary></AppShell></ProtectedRoute>} />
 
           {/* Consolidate old routes */}
           <Route path="/recommendations" element={<Navigate to="/products?tab=recommendations" replace />} />

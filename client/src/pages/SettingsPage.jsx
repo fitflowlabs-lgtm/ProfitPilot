@@ -37,6 +37,8 @@ export default function SettingsPage() {
   const [successMsg, setSuccessMsg] = useState('');
   const [error, setError] = useState('');
   const [portalLoading, setPortalLoading] = useState(false);
+  const [webhookLoading, setWebhookLoading] = useState(false);
+  const [webhookResult, setWebhookResult] = useState(null);
 
   useEffect(() => {
     const load = async () => {
@@ -78,6 +80,19 @@ export default function SettingsPage() {
       setError(err.message);
     } finally {
       setPortalLoading(false);
+    }
+  };
+
+  const handleRegisterWebhooks = async () => {
+    setWebhookLoading(true);
+    setWebhookResult(null);
+    try {
+      const data = await api.post('/api/webhooks/register');
+      setWebhookResult({ type: 'success', message: data.message || 'Webhooks registered successfully.' });
+    } catch (err) {
+      setWebhookResult({ type: 'error', message: err.message || 'Failed to register webhooks.' });
+    } finally {
+      setWebhookLoading(false);
     }
   };
 
@@ -202,6 +217,20 @@ export default function SettingsPage() {
                 </div>
               }
             />
+            <FieldRow
+              label="Webhooks"
+              value="Shopify event listeners"
+              action={
+                <Button variant="secondary" size="sm" loading={webhookLoading} onClick={handleRegisterWebhooks}>
+                  Re-register
+                </Button>
+              }
+            />
+            {webhookResult && (
+              <div style={{ marginTop: 8 }}>
+                <Alert type={webhookResult.type} message={webhookResult.message} onDismiss={() => setWebhookResult(null)} />
+              </div>
+            )}
             <div style={{ marginTop: 14 }}>
               <Button variant="secondary" size="sm" onClick={() => window.location.href = '/auth'}>
                 Reconnect store

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../api.js';
 import { useAuth } from '../App.jsx';
-import { Button, Alert, Card, Badge, Skeleton, PageHeader, formatCurrency, formatPercent, marginColor } from '../components/UI.jsx';
+import { Button, Alert, Card, Badge, Skeleton, PageHeader, Tabs, formatCurrency, formatPercent, marginColor } from '../components/UI.jsx';
 
 function ResultPanel({ results, loading, isPro }) {
   if (loading) {
@@ -121,6 +121,104 @@ function effectiveDiscount(dealType, pctValue, fixedValue, price) {
   }
 }
 
+/* ─── Discount Simulator ─── */
+function DiscountSimulator({ products }) {
+  const [discount, setDiscount] = useState(20);
+  const [filter, setFilter] = useState('all');
+
+  const rows = products
+    .filter(p => p.cost != null && p.price > 0)
+    .map(p => {
+      const discountedPrice = p.price * (1 - discount / 100);
+      const marginAfter = ((discountedPrice - p.cost) / discountedPrice) * 100;
+      const marginBefore = ((p.price - p.cost) / p.price) * 100;
+      const delta = marginAfter - marginBefore;
+      return { ...p, discountedPrice, marginAfter, marginBefore, delta };
+    })
+    .sort((a, b) => a.delta - b.delta); // worst first
+
+  const filtered = rows.filter(r => {
+    if (filter === 'risky') return r.marginAfter >= 0 && r.marginAfter < 15;
+    if (filter === 'loss') return r.marginAfter < 0;
+    return true;
+  });
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <Card>
+        <div className="font-display" style={{ fontSize: '15px', fontWeight: 700, marginBottom: 16 }}>Discount Simulator</div>
+        <div>
+          <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Discount %</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <input type="range" min={0} max={100} step={1} value={discount} onChange={e => setDiscount(Number(e.target.value))} style={{ flex: 1, accentColor: 'var(--accent)' }} />
+            <span className="mono" style={{ fontSize: '20px', fontWeight: 700, color: 'var(--accent)', minWidth: 50 }}>{discount}%</span>
+          </div>
+        </div>
+      </Card>
+
+      {/* Filter */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {[
+          { label: 'All', value: 'all' },
+          { label: 'Risky (< 15%)', value: 'risky' },
+          { label: 'Loss only', value: 'loss' },
+        ].map(opt => {
+          const active = filter === opt.value;
+          return (
+            <button key={opt.value} onClick={() => setFilter(opt.value)} style={{ padding: '5px 12px', borderRadius: 20, fontSize: '12.5px', fontWeight: 600, cursor: 'pointer', transition: 'var(--transition)', border: active ? '1px solid var(--accent-border)' : '1px solid var(--border)', background: active ? 'var(--accent-subtle)' : 'var(--surface)', color: active ? 'var(--accent)' : 'var(--text-secondary)' }}>
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {products.filter(p => p.cost != null).length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)', fontSize: '13.5px' }}>
+          No products with COGS set. Add costs in the Products page.
+        </div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-muted)', fontSize: '13.5px' }}>
+          No products match the current filter.
+        </div>
+      ) : (
+        <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: 'var(--surface)' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 560 }}>
+              <thead>
+                <tr style={{ background: 'var(--surface-raised)', borderBottom: '1px solid var(--border)' }}>
+                  {['Product', 'Orig. Price', 'Disc. Price', 'Margin Before', 'Margin After'].map(h => (
+                    <th key={h} style={{ padding: '9px 14px', textAlign: h === 'Product' ? 'left' : 'right', fontSize: '11.5px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((r, i) => {
+                  const isLoss = r.marginAfter < 0;
+                  const isRisky = !isLoss && r.marginAfter < 15;
+                  const afterColor = isLoss ? 'var(--red)' : isRisky ? 'var(--yellow)' : 'var(--green)';
+                  return (
+                    <tr key={r.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-subtle)' : 'none', background: isLoss ? 'var(--red-bg)' : 'transparent', transition: 'background 0.15s ease' }}>
+                      <td style={{ padding: '10px 14px', fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {r.productTitle}
+                        {isLoss && <span style={{ marginLeft: 6, fontSize: '11.5px', fontWeight: 700, color: 'var(--red)', background: 'var(--red-bg)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--red-border)' }}>LOSS</span>}
+                        {isRisky && !isLoss && <span style={{ marginLeft: 6, fontSize: '11.5px', fontWeight: 700, color: 'var(--yellow)', background: 'var(--yellow-bg)', padding: '1px 6px', borderRadius: 3, border: '1px solid var(--yellow-border)' }}>RISKY</span>}
+                      </td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'line-through' }}>{formatCurrency(r.price)}</td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13.5px', fontWeight: 600, color: 'var(--accent)' }}>{formatCurrency(r.discountedPrice)}</td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13px', color: marginColor(r.marginBefore) }}>{formatPercent(r.marginBefore)}</td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right', fontFamily: 'monospace', fontSize: '13.5px', fontWeight: 700, color: afterColor }}>{formatPercent(r.marginAfter)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DealsPage() {
   const { user } = useAuth();
   const [products, setProducts] = useState([]);
@@ -133,6 +231,7 @@ export default function DealsPage() {
   const [productsLoading, setProductsLoading] = useState(true);
   const [results, setResults] = useState(null);
   const [error, setError] = useState('');
+  const [dealsTab, setDealsTab] = useState('simulator');
   const isPro = user?.plan === 'pro';
 
   useEffect(() => {
@@ -203,7 +302,20 @@ export default function DealsPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
+      <Tabs
+        tabs={[
+          { id: 'simulator', label: 'Deal Simulator' },
+          { id: 'discount', label: 'Discount Simulator' },
+        ]}
+        activeTab={dealsTab}
+        onChange={setDealsTab}
+      />
+
+      {dealsTab === 'discount' && (
+        <DiscountSimulator products={products} />
+      )}
+
+      {dealsTab === 'simulator' && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, alignItems: 'start' }}>
         {/* Left: Form */}
         <Card>
           <form onSubmit={handleSimulate} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -331,7 +443,7 @@ export default function DealsPage() {
 
         {/* Right: Results */}
         <ResultPanel results={results} loading={loading} isPro={isPro} />
-      </div>
+      </div>}
     </div>
   );
 }

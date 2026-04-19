@@ -7,6 +7,8 @@ import {
   SearchInput, PageHeader, Tabs, formatCurrency, formatPercent,
   marginColor, marginStatus, MarginBar, Skeleton, Badge, Card
 } from '../components/UI.jsx';
+import COGSImportModal from '../components/COGSImportModal.jsx';
+import AlertsTab from '../components/AlertsTab.jsx';
 
 /* ─── Helpers ─── */
 const ANALYSIS_KEY = 'mp_ai_analysis';
@@ -266,12 +268,170 @@ function AIAnalysisRow({ variantId, productTitle, isPro, analyses, onAnalyzed })
   );
 }
 
+/* ─── Product Detail Panel (inline expand) ─── */
+function ProductDetailPanel({ product }) {
+  const [detailTab, setDetailTab] = useState('trend');
+  const [snapshots, setSnapshots] = useState([]);
+  const [costLog, setCostLog] = useState([]);
+  const [trendLoading, setTrendLoading] = useState(true);
+  const [costLogLoading, setCostLogLoading] = useState(false);
+
+  useEffect(() => {
+    setTrendLoading(true);
+    api.get(`/api/variants/${product.id}/snapshots`)
+      .then(d => setSnapshots(d.snapshots || d || []))
+      .catch(() => setSnapshots([]))
+      .finally(() => setTrendLoading(false));
+  }, [product.id]);
+
+  const handleCostHistoryTab = async () => {
+    setDetailTab('cost');
+    if (costLog.length > 0) return;
+    setCostLogLoading(true);
+    try {
+      const d = await api.get(`/api/variants/${product.id}/cost-log`);
+      setCostLog(d.log || d || []);
+    } catch { setCostLog([]); }
+    finally { setCostLogLoading(false); }
+  };
+
+  // SVG chart
+  const chartWidth = 400;
+  const chartHeight = 80;
+  const validSnaps = snapshots.filter(s => s.marginPercent != null);
+  const currentMargin = product.marginPercent;
+
+  let change30d = null;
+  if (validSnaps.length >= 2) {
+    const oldest = validSnaps[0].marginPercent;
+    const newest = validSnaps[validSnaps.length - 1].marginPercent;
+    change30d = newest - oldest;
+  }
+
+  const points = validSnaps.map((s, i) => {
+    const x = validSnaps.length > 1 ? (i / (validSnaps.length - 1)) * chartWidth : chartWidth / 2;
+    const y = chartHeight - Math.max(0, Math.min(100, s.marginPercent)) / 100 * chartHeight;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <div style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-raised)', padding: '16px 18px', animation: 'fadeIn 0.2s ease' }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 0 }}>
+        {[{ id: 'trend', label: 'Margin Trend' }, { id: 'cost', label: 'Cost History' }].map(t => {
+          const isActive = detailTab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={t.id === 'cost' ? handleCostHistoryTab : () => setDetailTab('trend')}
+              style={{ padding: '7px 14px', fontSize: '13px', fontWeight: isActive ? 600 : 500, color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)', background: 'none', border: 'none', borderBottom: isActive ? '2px solid var(--accent)' : '2px solid transparent', cursor: 'pointer', transition: 'var(--transition)', marginBottom: '-1px' }}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {detailTab === 'trend' && (
+        trendLoading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Skeleton height={80} />
+            <Skeleton height={12} width="40%" />
+          </div>
+        ) : validSnaps.length === 0 ? (
+          <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>No snapshot data available yet.</div>
+        ) : (
+          <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: 280 }}>
+              {/* Stats */}
+              <div style={{ display: 'flex', gap: 16, marginBottom: 14 }}>
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 2 }}>Current margin</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: '18px', fontWeight: 700, color: marginColor(currentMargin) }}>{formatPercent(currentMargin)}</div>
+                </div>
+                {change30d != null && (
+                  <div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 2 }}>30d change</div>
+                    <div style={{ fontFamily: 'monospace', fontSize: '18px', fontWeight: 700, color: change30d >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                      {change30d >= 0 ? '↑' : '↓'} {Math.abs(change30d).toFixed(1)}pp
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* SVG line chart */}
+              <svg width="100%" viewBox={`0 0 ${chartWidth} ${chartHeight}`} preserveAspectRatio="none" style={{ display: 'block', borderRadius: 6, background: 'var(--surface)' }}>
+                {validSnaps.length > 1 && (
+                  <polyline points={points} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                )}
+                {validSnaps.map((s, i) => {
+                  const x = validSnaps.length > 1 ? (i / (validSnaps.length - 1)) * chartWidth : chartWidth / 2;
+                  const y = chartHeight - Math.max(0, Math.min(100, s.marginPercent)) / 100 * chartHeight;
+                  return <circle key={i} cx={x} cy={y} r="3" fill="var(--accent)" />;
+                })}
+              </svg>
+            </div>
+            {/* Table */}
+            <div style={{ flex: 1, minWidth: 220, maxHeight: 200, overflowY: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: 'left', padding: '4px 8px', color: 'var(--text-muted)', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>Date</th>
+                    <th style={{ textAlign: 'right', padding: '4px 8px', color: 'var(--text-muted)', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>Price</th>
+                    <th style={{ textAlign: 'right', padding: '4px 8px', color: 'var(--text-muted)', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>Cost</th>
+                    <th style={{ textAlign: 'right', padding: '4px 8px', color: 'var(--text-muted)', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase' }}>Margin</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {validSnaps.map((s, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <td style={{ padding: '5px 8px', color: 'var(--text-secondary)' }}>{s.date ? new Date(s.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}</td>
+                      <td style={{ padding: '5px 8px', textAlign: 'right', fontFamily: 'monospace' }}>{formatCurrency(s.price)}</td>
+                      <td style={{ padding: '5px 8px', textAlign: 'right', fontFamily: 'monospace' }}>{formatCurrency(s.cost)}</td>
+                      <td style={{ padding: '5px 8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: marginColor(s.marginPercent) }}>{formatPercent(s.marginPercent)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      )}
+
+      {detailTab === 'cost' && (
+        costLogLoading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[1, 2, 3].map(i => <Skeleton key={i} height={36} />)}
+          </div>
+        ) : costLog.length === 0 ? (
+          <div style={{ color: 'var(--text-muted)', fontSize: '13px' }}>No cost history available.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {costLog.map((entry, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 12px', borderRadius: 7, background: 'var(--surface)', border: '1px solid var(--border-subtle)' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', minWidth: 80 }}>{entry.date ? new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
+                <span style={{ fontFamily: 'monospace', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'line-through' }}>{formatCurrency(entry.oldCost)}</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>→</span>
+                <span style={{ fontFamily: 'monospace', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{formatCurrency(entry.newCost)}</span>
+                {entry.marginImpact != null && (
+                  <span style={{ fontSize: '12px', fontFamily: 'monospace', color: entry.marginImpact >= 0 ? 'var(--green)' : 'var(--red)', fontWeight: 600, marginLeft: 'auto' }}>
+                    {entry.marginImpact >= 0 ? '+' : ''}{entry.marginImpact.toFixed(1)}pp
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
 /* ─── Products Tab ─── */
 function ProductsTab({ products, loading, onCostSaved, saving, isPro }) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [costModal, setCostModal] = useState(null);
   const [expandedAI, setExpandedAI] = useState({});
+  const [expandedDetail, setExpandedDetail] = useState({});
   const [analyses, setAnalyses] = useState(loadSavedAnalyses);
 
   const handleAnalyzed = (variantId, text) => {
@@ -333,23 +493,30 @@ function ProductsTab({ products, loading, onCostSaved, saving, isPro }) {
       ) : (
         <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: 'var(--surface)' }}>
           {/* Table header */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.2fr 1.5fr 1fr 80px', gap: 0, padding: '8px 16px', background: 'var(--surface-raised)', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.2fr 1.5fr 1fr 120px', gap: 0, padding: '8px 16px', background: 'var(--surface-raised)', borderBottom: '1px solid var(--border)' }}>
             {['Product', 'SKU', 'Price', 'Cost', 'Margin', 'Status', ''].map(h => (
               <div key={h} style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{h}</div>
             ))}
           </div>
           {filtered.map((p, i) => {
             const isExpanded = expandedAI[p.id];
+            const isDetailExpanded = expandedDetail[p.id];
             return (
               <div key={p.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
                 <div
-                  style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.2fr 1.5fr 1fr 80px', gap: 0, padding: '11px 16px', transition: 'background 0.15s ease', cursor: 'default', alignItems: 'center' }}
+                  style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.2fr 1.5fr 1fr 120px', gap: 0, padding: '11px 16px', transition: 'background 0.15s ease', cursor: 'default', alignItems: 'center' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-raised)'}
                   onMouseLeave={e => e.currentTarget.style.background = ''}
                 >
-                  {/* Product name */}
+                  {/* Product name — click to expand details */}
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.productTitle}</div>
+                    <button
+                      onClick={() => setExpandedDetail(prev => ({ ...prev, [p.id]: !prev[p.id] }))}
+                      title="View margin trend and cost history"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', width: '100%' }}
+                    >
+                      <div style={{ fontSize: '13.5px', fontWeight: 600, color: isDetailExpanded ? 'var(--accent)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.productTitle}</div>
+                    </button>
                     {p.variantTitle && p.variantTitle !== 'Default' && <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>{p.variantTitle}</div>}
                   </div>
                   {/* SKU */}
@@ -377,8 +544,8 @@ function ProductsTab({ products, loading, onCostSaved, saving, isPro }) {
                   <div>
                     <StatusBadge variant={p.cost == null ? 'missing_cost' : marginStatus(p.marginPercent)} />
                   </div>
-                  {/* AI toggle */}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  {/* AI toggle + Details */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
                     <button
                       onClick={() => setExpandedAI(prev => ({ ...prev, [p.id]: !prev[p.id] }))}
                       title="AI Analysis"
@@ -401,6 +568,8 @@ function ProductsTab({ products, loading, onCostSaved, saving, isPro }) {
                     </button>
                   </div>
                 </div>
+                {/* Detail panel (margin trend / cost history) */}
+                {isDetailExpanded && <ProductDetailPanel product={p} />}
                 {/* AI analysis row */}
                 {isExpanded && (
                   <AIAnalysisRow
@@ -419,7 +588,7 @@ function ProductsTab({ products, loading, onCostSaved, saving, isPro }) {
 
       {!loading && filtered.length > 0 && (
         <div style={{ marginTop: 8, fontSize: '12px', color: 'var(--text-muted)' }}>
-          {filtered.length} of {products.length} products · Click cost to edit · Click AI to analyze
+          {filtered.length} of {products.length} products · Click product name to view trend · Click cost to edit · Click AI to analyze
         </div>
       )}
 
@@ -575,6 +744,28 @@ function RecommendationsTab({ products, loading, isPro }) {
   );
 }
 
+/* ─── CSV Export ─── */
+function exportProductsCSV(products) {
+  const header = 'Product,SKU,Price,COGS,Margin %,Units Sold 30d,Revenue 30d';
+  const rows = products.map(p => [
+    `"${(p.productTitle || '').replace(/"/g, '""')}"`,
+    p.sku || '',
+    p.price != null ? p.price.toFixed(2) : '',
+    p.cost != null ? p.cost.toFixed(2) : '',
+    p.marginPercent != null ? p.marginPercent.toFixed(1) : '',
+    p.unitsSold30d ?? '',
+    p.revenue30d != null ? p.revenue30d.toFixed(2) : '',
+  ].join(','));
+  const csv = [header, ...rows].join('\n');
+  const date = new Date().toISOString().slice(0, 10);
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `margin-pilot-products-${date}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 /* ─── Main ─── */
 export default function ProductsPage() {
   const { user, sync, syncing } = useAuth();
@@ -583,6 +774,7 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState({});
+  const [cogsModalOpen, setCogsModalOpen] = useState(false);
   const isPro = user?.plan === 'pro';
 
   const tabFromUrl = searchParams.get('tab') || 'products';
@@ -625,13 +817,21 @@ export default function ProductsPage() {
         title="Products"
         subtitle="Manage costs, track margins, and optimize prices"
         actions={
-          <Button variant="secondary" size="sm" loading={syncing} onClick={handleSyncAndReload}>
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <path d="M11.5 2.5A5.5 5.5 0 0 0 1 6.5M1.5 10.5A5.5 5.5 0 0 0 12 6.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-              <path d="M11 0.5v2.5H8.5M2 12.5v-2.5H4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Sync
-          </Button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button variant="secondary" size="sm" onClick={() => exportProductsCSV(products)}>
+              Export CSV
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setCogsModalOpen(true)}>
+              Import COGS
+            </Button>
+            <Button variant="secondary" size="sm" loading={syncing} onClick={handleSyncAndReload}>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <path d="M11.5 2.5A5.5 5.5 0 0 0 1 6.5M1.5 10.5A5.5 5.5 0 0 0 12 6.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                <path d="M11 0.5v2.5H8.5M2 12.5v-2.5H4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Sync
+            </Button>
+          </div>
         }
       />
 
@@ -641,6 +841,7 @@ export default function ProductsPage() {
         tabs={[
           { id: 'products', label: 'Products', count: products.length },
           { id: 'recommendations', label: 'Recommendations', count: recsCount || undefined },
+          { id: 'alerts', label: 'Alerts' },
         ]}
         activeTab={tab}
         onChange={setTab}
@@ -658,6 +859,15 @@ export default function ProductsPage() {
       {tab === 'recommendations' && (
         <RecommendationsTab products={products} loading={loading} isPro={isPro} />
       )}
+      {tab === 'alerts' && (
+        <AlertsTab products={products} />
+      )}
+
+      <COGSImportModal
+        isOpen={cogsModalOpen}
+        onClose={() => setCogsModalOpen(false)}
+        onImported={load}
+      />
     </div>
   );
 }
