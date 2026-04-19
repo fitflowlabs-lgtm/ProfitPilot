@@ -46,7 +46,7 @@ app.use(
 );
 
 // Raw body for webhook HMAC verification — MUST be before express.json()
-app.use(["/webhooks", "/api/webhooks/stripe"], express.raw({ type: "application/json" }));
+app.use(["/webhooks", "/api/webhooks/stripe", "/api/webhooks/shopify"], express.raw({ type: "application/json" }));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -73,6 +73,7 @@ const { verifyConnection, sendVerificationEmail } = require("./src/mailer");
 const supportRouter = require("./src/routes/support");
 const { createSupportTicket } = require("./src/supportHelper");
 const { startPoller } = require("./src/emailPoller");
+const newFeaturesHelpers = require("./src/routes/newFeatures");
 
 // -----------------------------
 // Rate Limiter (in-memory)
@@ -106,6 +107,9 @@ setInterval(() => {
 
 // Support router (admin only)
 app.use("/api/support", requireAdmin, supportRouter);
+
+// New features router
+app.use("/api", require("./src/routes/newFeatures")(prisma, requireStore, handleShopifyError));
 
 // -----------------------------
 // Helpers
@@ -207,6 +211,10 @@ async function syncProductsForStore(store) {
     }
   }
   await prisma.store.update({ where: { id: store.id }, data: { lastProductsSyncAt: new Date() } });
+  // Refresh store reference after update
+  const updatedStore = await prisma.store.findUnique({ where: { id: store.id } });
+  try { await newFeaturesHelpers.captureSnapshots(updatedStore, prisma); } catch (e) { console.error("captureSnapshots error:", e.message); }
+  try { await newFeaturesHelpers.checkAlerts(updatedStore, prisma); } catch (e) { console.error("checkAlerts error:", e.message); }
 }
 
 async function syncOrdersForStore(store) {
@@ -317,10 +325,13 @@ app.get("/auth/callback", async (req, res) => {
 // Webhooks
 // -----------------------------
 async function registerWebhooks(shop, accessToken) {
-  const url = `${process.env.APP_URL}/webhooks/app-uninstalled`;
-  try {
-    await fetch(`https://${shop}/admin/api/2024-01/webhooks.json`, { method: "POST", headers: { "X-Shopify-Access-Token": accessToken, "Content-Type": "application/json" }, body: JSON.stringify({ webhook: { topic: "app/uninstalled", address: url, format: "json" } }) });
-  } catch (e) { console.error("Webhook registration error:", e.message); }
+  const baseUrl = `${process.env.APP_URL}/api/webhooks/shopify`;
+  const topics = ["products/update", "orders/create", "app/uninstalled"];
+  for (const topic of topics) {
+    try {
+      await fetch(`https://${shop}/admin/api/2024-01/webhooks.json`, { method: "POST", headers: { "X-Shopify-Access-Token": accessToken, "Content-Type": "application/json" }, body: JSON.stringify({ webhook: { topic, address: baseUrl, format: "json" } }) });
+    } catch (e) { console.error(`Webhook registration error [${topic}]:`, e.message); }
+  }
 }
 
 app.post("/webhooks/app-uninstalled", async (req, res) => {
@@ -594,7 +605,9 @@ app.put("/api/products/:variantId/cost", requireStore, async (req, res) => {
     const parsed = parseFloat(cogs); if (isNaN(parsed) || parsed < 0) return res.status(400).json({ error: "Invalid cost value" });
     const variant = await prisma.variant.findUnique({ where: { id: variantId } });
     if (!variant || variant.storeId !== req.store.id) return res.status(404).json({ error: "Variant not found" });
+    const oldCogs = variant.cogs ?? null;
     const updated = await prisma.variant.update({ where: { id: variantId }, data: { cogs: parsed }, include: { product: true } });
+    await prisma.supplierCostLog.create({ data: { variantId, storeId: req.store.id, oldCogs, newCogs: parsed } });
     const price = updated.price, cost = updated.cogs, profit = cost != null ? price - cost : null, marginPercent = cost != null && price > 0 ? (profit / price) * 100 : null;
     res.json({ ok: true, variant: { id: updated.id, productTitle: updated.product.title, sku: updated.sku, price, cost, profit, marginPercent } });
   } catch (e) { res.status(500).json({ error: e.message }); }
