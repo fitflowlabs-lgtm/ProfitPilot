@@ -164,10 +164,7 @@ module.exports = (prisma, requireStore, handleShopifyError) => {
     }
   });
 
-  // ------------------------------------------------------------------
-  // POST /api/sync/metafields-cogs
-  // Pull COGS from Shopify metafields and update variants
-  // ------------------------------------------------------------------
+  // POST /api/sync/metafields-cogs — Pull COGS from Shopify metafields and update variants
   router.post("/sync/metafields-cogs", requireStore, async (req, res) => {
     try {
       const variants = await prisma.variant.findMany({ where: { storeId: req.store.id } });
