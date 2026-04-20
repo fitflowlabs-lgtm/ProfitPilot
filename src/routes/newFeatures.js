@@ -99,6 +99,9 @@ module.exports = (prisma, requireStore, handleShopifyError) => {
       });
       res.json({ alerts });
     } catch (e) {
+      if (e.message?.includes("does not exist") || e.code === "P2021") {
+        return res.json({ alerts: [] });
+      }
       res.status(500).json({ error: e.message });
     }
   });
@@ -159,6 +162,9 @@ module.exports = (prisma, requireStore, handleShopifyError) => {
       });
       res.json({ firing, all });
     } catch (e) {
+      if (e.message?.includes("does not exist") || e.code === "P2021") {
+        return res.json({ firing: [], all: [] });
+      }
       res.status(500).json({ error: e.message });
     }
   });

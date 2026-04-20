@@ -216,7 +216,6 @@ export default function SettingsPage() {
                   <span style={{ fontSize: '12.5px', color: 'var(--green)', fontWeight: 600 }}>Connected</span>
                 </div>
               }
-              last
             />
             <FieldRow
               label="Webhooks"
@@ -226,13 +225,14 @@ export default function SettingsPage() {
                   Re-register
                 </Button>
               }
+              last={!webhookResult}
             />
             {webhookResult && (
-              <div style={{ marginTop: 8 }}>
+              <div style={{ padding: '10px 18px', borderTop: '1px solid var(--border-subtle)' }}>
                 <Alert type={webhookResult.type} message={webhookResult.message} onDismiss={() => setWebhookResult(null)} />
               </div>
             )}
-            <div style={{ marginTop: 14 }}>
+            <div style={{ padding: '12px 18px', borderTop: '1px solid var(--border-subtle)' }}>
               <Button variant="secondary" size="sm" onClick={() => window.location.href = '/auth'}>
                 Reconnect store
               </Button>

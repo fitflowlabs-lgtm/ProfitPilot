@@ -312,6 +312,54 @@ function exportProductsCSV(products) {
   URL.revokeObjectURL(url);
 }
 
+/* ─── COGS Help Tooltip ─── */
+function COGSHelpTooltip() {
+  const [visible, setVisible] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!visible) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setVisible(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [visible]);
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-flex' }}>
+      <button
+        type="button"
+        onClick={() => setVisible(v => !v)}
+        style={{
+          width: 18, height: 18, borderRadius: '50%', border: '1.5px solid var(--border)',
+          background: visible ? 'var(--surface-raised)' : 'var(--surface)',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', lineHeight: 1,
+          transition: 'var(--transition)', flexShrink: 0,
+        }}
+        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)'; }}
+        onMouseLeave={e => { if (!visible) { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)'; } }}
+        aria-label="What is COGS?"
+      >
+        ?
+      </button>
+      {visible && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 300,
+          width: 280, padding: '12px 14px', borderRadius: 'var(--radius-lg)',
+          background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)',
+          fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6,
+        }}>
+          <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6, fontSize: '13.5px' }}>What is COGS?</div>
+          COGS (Cost of Goods Sold) is what you pay your supplier for each product — not the price you charge customers.
+          <div style={{ marginTop: 8, color: 'var(--text-muted)', fontSize: '12px' }}>
+            Import a CSV with <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-primary)' }}>sku</span> and <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-primary)' }}>cost</span> columns to set costs in bulk, or sync from Shopify product metafields.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Main ─── */
 export default function ProductsPage() {
   const { user, sync, syncing } = useAuth();
@@ -367,9 +415,12 @@ export default function ProductsPage() {
             <Button variant="secondary" size="sm" onClick={() => exportProductsCSV(products)}>
               Export CSV
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => setCogsModalOpen(true)}>
-              Import COGS
-            </Button>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Button variant="secondary" size="sm" onClick={() => setCogsModalOpen(true)}>
+                Import COGS
+              </Button>
+              <COGSHelpTooltip />
+            </div>
             <Button variant="secondary" size="sm" loading={syncing} onClick={handleSyncAndReload}>
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
                 <path d="M11.5 2.5A5.5 5.5 0 0 0 1 6.5M1.5 10.5A5.5 5.5 0 0 0 12 6.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />

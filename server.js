@@ -733,9 +733,9 @@ app.get("/api/inventory", requireStore, async (req, res) => {
       const unitsSold30 = recentSales.reduce((s, i) => s + i.quantity, 0), dailySales = unitsSold30 / 30;
       const sm = getSeasonalMultiplier(v.product.title), adj = dailySales * sm;
       const days = adj > 0 ? inventory / adj : Infinity;
-      let rec = "No action needed", rq = 0, status = "good";
-      if (adj === 0) { rec = "No sales data"; status = "no_data"; } else if (days < 7) { rq = Math.ceil(adj * 30); rec = `URGENT: reorder ${rq} units`; status = "urgent"; urgentReorders++; } else if (days < 14) { rq = Math.ceil(adj * 21); rec = `Reorder soon: ${rq} units`; status = "soon"; reorderSoon++; } else if (days > 60 && days !== Infinity) { rec = "Overstock risk"; status = "overstock"; overstockRisks++; } else { healthyInventory++; }
-      return { id: v.id, productTitle: v.product.title, sku: v.sku || "Default", inventory, unitsSold30, dailySales: Math.round(dailySales * 100) / 100, seasonalMultiplier: sm, adjustedDailySales: Math.round(adj * 100) / 100, daysOfInventory: days === Infinity ? null : Math.round(days * 10) / 10, reorderQty: rq, recommendation: rec, status };
+      let rec = "No action needed", rq = 0, status = "good", deadStock = false;
+      if (inventory === 0) { rec = "Out of stock"; status = "out"; } else if (adj === 0) { rec = "No recent sales"; deadStock = true; } else if (days < 7) { rq = Math.ceil(adj * 30); rec = `URGENT: reorder ${rq} units`; status = "critical"; urgentReorders++; } else if (days < 14) { rq = Math.ceil(adj * 21); rec = `Reorder soon: ${rq} units`; status = "low"; reorderSoon++; } else if (days > 60 && days !== Infinity) { rec = "Overstock risk"; status = "overstock"; overstockRisks++; } else { healthyInventory++; }
+      return { id: v.id, productTitle: v.product.title, sku: v.sku || "Default", inventory, unitsSold30, dailySales: Math.round(dailySales * 100) / 100, seasonalMultiplier: sm, adjustedDailySales: Math.round(adj * 100) / 100, daysOfInventory: days === Infinity ? null : Math.round(days * 10) / 10, reorderQty: rq, recommendation: rec, status, deadStock, cogs: v.cogs ?? null };
     });
     res.json({ summary: { total: variants.length, urgentReorders, reorderSoon, overstockRisks, healthyInventory }, items });
   } catch (e) { const h = handleShopifyError(e, res, req.store.shopDomain); if (h) return; res.status(500).json({ error: e.message }); }
