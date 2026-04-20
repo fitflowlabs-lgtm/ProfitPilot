@@ -126,7 +126,7 @@ export default function SettingsPage() {
       )}
 
       {/* 2-column grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 24, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'start' }}>
 
         {/* LEFT COLUMN */}
         <div>
