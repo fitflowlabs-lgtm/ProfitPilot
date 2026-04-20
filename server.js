@@ -182,7 +182,7 @@ function handleShopifyError(error, res, shop) {
 app.use("/api/support", requireAdmin, supportRouter);
 
 // New features router — mounted after helpers are defined
-app.use("/api", require("./src/routes/newFeatures")(prisma, requireStore, handleShopifyError));
+app.use("/api", require("./src/routes/newFeatures")(prisma, requireStore, handleShopifyError, openai));
 
 // -----------------------------
 // Paginated Shopify fetch

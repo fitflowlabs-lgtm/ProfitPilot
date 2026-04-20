@@ -7,7 +7,7 @@ function verifyWebhookHmac(rawBody, hmacHeader, secret) {
   try { return crypto.timingSafeEqual(Buffer.from(hmacHeader), Buffer.from(computed)); } catch { return false; }
 }
 
-module.exports = (prisma, requireStore, handleShopifyError) => {
+module.exports = (prisma, requireStore, handleShopifyError, openai) => {
   const router = express.Router();
 
   // ------------------------------------------------------------------
@@ -444,6 +444,72 @@ module.exports = (prisma, requireStore, handleShopifyError) => {
         take: 20,
       });
       res.json({ logs });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ------------------------------------------------------------------
+  // POST /api/variants/parse-cogs-ai
+  // Use OpenAI to identify which columns in an uploaded spreadsheet
+  // contain the SKU/product identifier and the cost/price value.
+  // Body: { headers: string[], rows: string[][], totalRows: number }
+  // Returns: { skuCol: number, costCol: number, skuHeader: string, costHeader: string }
+  // ------------------------------------------------------------------
+  router.post("/variants/parse-cogs-ai", requireStore, async (req, res) => {
+    try {
+      const { headers, rows, totalRows } = req.body || {};
+      if (!Array.isArray(headers) || !Array.isArray(rows)) {
+        return res.status(400).json({ error: "headers and rows are required." });
+      }
+      if (!openai) {
+        return res.status(503).json({ error: "AI parsing not available." });
+      }
+
+      const sampleTable = [headers, ...rows.slice(0, 10)]
+        .map(r => r.join(" | "))
+        .join("\n");
+
+      const prompt = `You are analyzing a spreadsheet to find cost-of-goods data.
+
+Here are the column headers and first few rows:
+${sampleTable}
+
+Task: identify which column index (0-based) contains the product SKU / identifier, and which column index contains the unit cost / purchase price / supplier price.
+
+Rules:
+- SKU column: typically named "sku", "variant sku", "product id", "barcode", "item number", "style", or similar identifiers
+- Cost column: typically named "cost", "cogs", "unit cost", "wholesale price", "supplier price", "purchase price", or contains numeric money values
+- If there are multiple price columns, pick the one that represents the supplier/purchase cost (not retail price)
+- Return ONLY valid JSON — no explanation
+
+Return exactly this JSON:
+{"skuCol": <number>, "costCol": <number>, "skuHeader": "<header name>", "costHeader": "<header name>"}
+
+If you cannot identify either column, return {"skuCol": -1, "costCol": -1, "skuHeader": null, "costHeader": null}`;
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4.1-mini",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0,
+        max_tokens: 100,
+      });
+
+      const raw = completion.choices?.[0]?.message?.content?.trim() || "{}";
+      let parsed;
+      try {
+        parsed = JSON.parse(raw.replace(/```json?|```/g, "").trim());
+      } catch {
+        return res.status(500).json({ error: "AI returned an unparseable response. Try renaming your columns to 'sku' and 'cost'." });
+      }
+
+      res.json({
+        skuCol: parsed.skuCol ?? -1,
+        costCol: parsed.costCol ?? -1,
+        skuHeader: parsed.skuHeader ?? null,
+        costHeader: parsed.costHeader ?? null,
+        totalRows: totalRows ?? rows.length,
+      });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
