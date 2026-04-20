@@ -25,13 +25,21 @@ export default function COGSImportModal({ isOpen, onClose, onImported }) {
       return;
     }
     const parsed = [];
+    const rowErrors = [];
     for (let i = 1; i < lines.length; i++) {
       const cols = lines[i].split(',').map(c => c.trim());
       const sku = cols[skuIdx];
-      const cost = parseFloat(cols[costIdx]);
-      if (sku && !isNaN(cost)) parsed.push({ sku, cost });
+      const costRaw = cols[costIdx];
+      const cost = parseFloat(costRaw);
+      if (!sku) { rowErrors.push(`Row ${i + 1}: missing SKU`); continue; }
+      if (isNaN(cost)) { rowErrors.push(`Row ${i + 1}: SKU "${sku}" has invalid cost "${costRaw || '(empty)'}"`); continue; }
+      parsed.push({ sku, cost });
     }
-    if (parsed.length === 0) { setParseError('No valid rows found in CSV.'); return; }
+    if (parsed.length === 0) {
+      setParseError(rowErrors.length > 0 ? rowErrors.slice(0, 3).join(' · ') + (rowErrors.length > 3 ? ` (+${rowErrors.length - 3} more)` : '') : 'No valid rows found in CSV.');
+      return;
+    }
+    if (rowErrors.length > 0) setParseError(`${rowErrors.length} row${rowErrors.length !== 1 ? 's' : ''} skipped: ${rowErrors.slice(0, 2).join(' · ')}${rowErrors.length > 2 ? ` (+${rowErrors.length - 2} more)` : ''}`);
     setRows(parsed);
   };
 
@@ -106,8 +114,11 @@ export default function COGSImportModal({ isOpen, onClose, onImported }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* Instructions */}
-        <div style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-          Upload a CSV with columns: <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-primary)' }}>sku, cost</span>
+        <div style={{ padding: '12px 14px', borderRadius: 'var(--radius)', background: 'var(--surface-raised)', border: '1px solid var(--border-subtle)', fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.65 }}>
+          <strong style={{ color: 'var(--text-primary)', fontWeight: 700 }}>COGS</strong> (Cost of Goods Sold) is the price you pay to source each product — what you paid your supplier, not what you charge customers. Setting accurate costs lets Margin Pilot calculate your real profit margins and flag products where you might be losing money.
+          <div style={{ marginTop: 8, fontSize: '12.5px', color: 'var(--text-muted)' }}>
+            Upload a CSV with two columns: <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-primary)' }}>sku</span> and <span style={{ fontFamily: 'monospace', fontWeight: 600, color: 'var(--text-primary)' }}>cost</span>. You can also sync costs directly from Shopify product metafields.
+          </div>
         </div>
 
         {/* Download template */}

@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../api.js';
 
 const icons = {
@@ -78,10 +78,12 @@ function StoreChip({ store, isActive, onSelect }) {
 
 export default function Sidebar({ user, stores, activeStore, onSwitchStore }) {
   const navigate = useNavigate();
-  const [addingStore, setAddingStore] = useState(false);
   const [shopInput, setShopInput] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [storeDropdownOpen, setStoreDropdownOpen] = useState(false);
+  const [addingNewStore, setAddingNewStore] = useState(false);
+  const dropdownRef = useRef(null);
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
@@ -89,6 +91,19 @@ export default function Sidebar({ user, stores, activeStore, onSwitchStore }) {
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
+
+  useEffect(() => {
+    if (!storeDropdownOpen) return;
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setStoreDropdownOpen(false);
+        setAddingNewStore(false);
+        setShopInput('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [storeDropdownOpen]);
 
   const handleLogout = async () => {
     try { await api.post('/api/logout'); } catch { /* ignore */ }
@@ -101,6 +116,13 @@ export default function Sidebar({ user, stores, activeStore, onSwitchStore }) {
     if (!domain) return;
     if (!domain.includes('.')) domain = `${domain}.myshopify.com`;
     window.location.href = `/auth?shop=${encodeURIComponent(domain)}`;
+  };
+
+  const handleSwitchStore = (shopDomain) => {
+    setStoreDropdownOpen(false);
+    setAddingNewStore(false);
+    setShopInput('');
+    onSwitchStore(shopDomain);
   };
 
   const closeMobile = () => setMobileOpen(false);
@@ -168,68 +190,115 @@ export default function Sidebar({ user, stores, activeStore, onSwitchStore }) {
         </div>
       </div>
 
-      {/* Store switcher */}
-      <div style={{ padding: '10px 8px', borderBottom: '1px solid var(--border-subtle)' }}>
-        <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', padding: '0 4px', marginBottom: 5 }}>
-          Stores
-        </div>
-        {stores.length === 0 && activeStore && (
-          <StoreChip store={activeStore} isActive onSelect={() => {}} />
-        )}
-        {stores.map(s => (
-          <StoreChip
-            key={s.shopDomain}
-            store={s}
-            isActive={activeStore?.shopDomain === s.shopDomain}
-            onSelect={onSwitchStore}
-          />
-        ))}
-        {addingStore ? (
-          <form onSubmit={handleAddStore} style={{ marginTop: 4, padding: '6px 4px' }}>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 5, fontWeight: 600, letterSpacing: '0.03em' }}>
-              Enter your Shopify domain
+      {/* Store switcher dropdown */}
+      <div ref={dropdownRef} style={{ padding: '8px 8px', borderBottom: '1px solid var(--border-subtle)', position: 'relative' }}>
+        <button
+          onClick={() => { setStoreDropdownOpen(o => !o); setAddingNewStore(false); setShopInput(''); }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+            padding: '7px 10px', borderRadius: 7, textAlign: 'left',
+            background: storeDropdownOpen ? 'var(--surface-raised)' : 'transparent',
+            border: '1px solid transparent', cursor: 'pointer', transition: 'var(--transition)',
+          }}
+          onMouseEnter={e => { if (!storeDropdownOpen) e.currentTarget.style.background = 'var(--surface-hover)'; }}
+          onMouseLeave={e => { if (!storeDropdownOpen) e.currentTarget.style.background = 'transparent'; }}
+        >
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: activeStore ? 'var(--green)' : 'var(--border)', flexShrink: 0 }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {activeStore?.name || activeStore?.shopDomain || 'No store'}
             </div>
-            <input
-              autoFocus
-              value={shopInput}
-              onChange={e => setShopInput(e.target.value)}
-              placeholder="yourstore.myshopify.com"
-              style={{
-                width: '100%', padding: '6px 8px', borderRadius: 6,
-                border: '1px solid var(--border)', fontSize: '12px',
-                fontFamily: "'JetBrains Mono', monospace",
-                outline: 'none', background: 'var(--surface)',
-                color: 'var(--text-primary)', boxSizing: 'border-box',
-                marginBottom: 6,
-              }}
-              onFocus={e => e.target.style.borderColor = 'var(--accent)'}
-              onBlur={e => e.target.style.borderColor = 'var(--border)'}
-            />
-            <div style={{ display: 'flex', gap: 5 }}>
+            {activeStore?.name && activeStore.name !== activeStore.shopDomain && (
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {activeStore.shopDomain}
+              </div>
+            )}
+          </div>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ flexShrink: 0, color: 'var(--text-muted)', transform: storeDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'var(--transition)' }}>
+            <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+
+        {storeDropdownOpen && (
+          <div style={{
+            position: 'absolute', top: '100%', left: 8, right: 8, zIndex: 200,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 8, boxShadow: 'var(--shadow-lg)', overflow: 'hidden',
+            marginTop: 2,
+          }}>
+            {(stores.length > 0 ? stores : (activeStore ? [activeStore] : [])).map(s => {
+              const isActive = activeStore?.shopDomain === s.shopDomain;
+              return (
+                <button
+                  key={s.shopDomain}
+                  onClick={() => handleSwitchStore(s.shopDomain)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                    padding: '8px 12px', textAlign: 'left',
+                    background: isActive ? 'var(--accent-subtle)' : 'transparent',
+                    border: 'none', borderBottom: '1px solid var(--border-subtle)',
+                    cursor: 'pointer', transition: 'var(--transition)',
+                  }}
+                  onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--surface-hover)'; }}
+                  onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: isActive ? 'var(--green)' : 'var(--border)', flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '12.5px', fontWeight: isActive ? 600 : 500, color: isActive ? 'var(--accent)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {s.name || s.shopDomain}
+                    </div>
+                    {s.name && s.name !== s.shopDomain && (
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.shopDomain}</div>
+                    )}
+                  </div>
+                  {isActive && (
+                    <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 5.5l2.5 2.5 4.5-5" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  )}
+                </button>
+              );
+            })}
+
+            {addingNewStore ? (
+              <form onSubmit={handleAddStore} style={{ padding: '10px 12px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 5, fontWeight: 600 }}>
+                  Enter your Shopify domain
+                </div>
+                <input
+                  autoFocus
+                  value={shopInput}
+                  onChange={e => setShopInput(e.target.value)}
+                  placeholder="yourstore.myshopify.com"
+                  style={{
+                    width: '100%', padding: '6px 8px', borderRadius: 6,
+                    border: '1px solid var(--border)', fontSize: '12px',
+                    fontFamily: "'JetBrains Mono', monospace",
+                    outline: 'none', background: 'var(--surface)',
+                    color: 'var(--text-primary)', boxSizing: 'border-box',
+                    marginBottom: 6,
+                  }}
+                  onFocus={e => e.target.style.borderColor = 'var(--accent)'}
+                  onBlur={e => e.target.style.borderColor = 'var(--border)'}
+                />
+                <div style={{ display: 'flex', gap: 5 }}>
+                  <button type="submit" style={{ flex: 1, padding: '5px 0', borderRadius: 5, background: 'var(--accent)', color: '#fff', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}>
+                    Connect
+                  </button>
+                  <button type="button" onClick={() => { setAddingNewStore(false); setShopInput(''); }} style={{ padding: '5px 10px', borderRadius: 5, background: 'var(--surface-raised)', color: 'var(--text-secondary)', border: '1px solid var(--border)', fontSize: '12px', cursor: 'pointer' }}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
               <button
-                type="submit"
-                style={{ flex: 1, padding: '5px 0', borderRadius: 5, background: 'var(--accent)', color: '#fff', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+                onClick={() => setAddingNewStore(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '12.5px', color: 'var(--accent)', fontWeight: 600, transition: 'var(--transition)' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-subtle)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
               >
-                Connect
+                {icons.plus} Connect new store
               </button>
-              <button
-                type="button"
-                onClick={() => { setAddingStore(false); setShopInput(''); }}
-                style={{ padding: '5px 10px', borderRadius: 5, background: 'var(--surface-raised)', color: 'var(--text-secondary)', border: '1px solid var(--border)', fontSize: '12px', cursor: 'pointer' }}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        ) : (
-          <button
-            onClick={() => setAddingStore(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 10px', borderRadius: 6, fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500, background: 'none', border: 'none', width: '100%', textAlign: 'left', marginTop: 3, transition: 'var(--transition)', cursor: 'pointer' }}
-            onMouseEnter={e => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-subtle)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.background = ''; }}
-          >
-            {icons.plus} Add store
-          </button>
+            )}
+          </div>
         )}
       </div>
 
