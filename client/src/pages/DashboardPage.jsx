@@ -196,7 +196,7 @@ function TopProductsCard() {
 
   useEffect(() => {
     api.get('/api/reports/profitability')
-      .then(d => setRows((d.products || d.rows || d || []).slice(0, 10)))
+      .then(d => setRows((d.profitability || d.products || d.rows || []).slice(0, 10)))
       .catch(() => setRows([]))
       .finally(() => setLoading(false));
   }, []);

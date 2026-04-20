@@ -98,7 +98,7 @@ export function PnLCard() {
 
   useEffect(() => {
     api.get('/api/reports/pnl?months=6')
-      .then(d => setRows(d.months || d.rows || d || []))
+      .then(d => setRows(d.pnl || d.months || d.rows || []))
       .catch(e => setError(e.message || 'Could not load P&L data.'))
       .finally(() => setLoading(false));
   }, []);
