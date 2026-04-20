@@ -92,8 +92,7 @@ module.exports = (prisma, requireStore, handleShopifyError) => {
         where: { storeId: req.store.id, active: true },
         include: {
           variant: {
-            include: { product: { select: { title: true } } },
-            select: { price: true, cogs: true, product: true },
+            select: { id: true, price: true, cogs: true, sku: true, product: { select: { title: true } } },
           },
         },
         orderBy: { createdAt: "desc" },
@@ -455,11 +454,25 @@ async function captureSnapshots(store, prisma) {
   const dayStart = new Date(new Date().setHours(0, 0, 0, 0));
   const since30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const variants = await prisma.variant.findMany({ where: { storeId: store.id } });
+  if (variants.length === 0) return 0;
+  const variantIds = variants.map((v) => v.id);
+
+  // Batch fetch all order items for this store's variants in the last 30d (avoids N+1)
+  const allOrderItems = await prisma.orderItem.findMany({
+    where: { variantId: { in: variantIds }, order: { createdAt: { gte: since30 } } },
+    select: { variantId: true, quantity: true, lineTotal: true },
+  });
+
+  // Group by variantId
+  const itemsByVariant = new Map();
+  for (const item of allOrderItems) {
+    if (!itemsByVariant.has(item.variantId)) itemsByVariant.set(item.variantId, []);
+    itemsByVariant.get(item.variantId).push(item);
+  }
+
   let captured = 0;
   for (const v of variants) {
-    const orderItems = await prisma.orderItem.findMany({
-      where: { variantId: v.id, order: { createdAt: { gte: since30 } } },
-    });
+    const orderItems = itemsByVariant.get(v.id) || [];
     const unitsSold30d = orderItems.reduce((s, i) => s + i.quantity, 0);
     const revenue30d = orderItems.reduce((s, i) => s + (i.lineTotal || 0), 0);
     await prisma.variantSnapshot.upsert({

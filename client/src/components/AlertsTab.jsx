@@ -38,7 +38,7 @@ export default function AlertsTab({ products }) {
     setAdding(true);
     setError('');
     try {
-      await api.post('/api/alerts', { variantId: newVariantId, thresholdPct: threshold });
+      await api.post('/api/alerts', { variantId: newVariantId, threshold: threshold / 100 });
       setNewVariantId('');
       setNewThreshold('20');
       await load();
@@ -74,9 +74,9 @@ export default function AlertsTab({ products }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             {firing.map((f, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '13.5px' }}>
-                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{f.productTitle || f.variantTitle || 'Unknown product'}</span>
-                <span style={{ color: 'var(--red)', fontFamily: 'monospace', fontWeight: 700 }}>{formatPercent(f.currentMargin)}</span>
-                <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>below {formatPercent(f.thresholdPct)} threshold</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{f.variant?.product?.title || 'Unknown product'}</span>
+                <span style={{ color: 'var(--red)', fontFamily: 'monospace', fontWeight: 700 }}>{formatPercent(f.currentMargin * 100)}</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>below {formatPercent(f.threshold * 100)} threshold</span>
               </div>
             ))}
           </div>
@@ -138,7 +138,10 @@ export default function AlertsTab({ products }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {alerts.map(alert => {
             const isFiring = firingIds.has(alert.id);
-            const mc = marginColor(alert.currentMargin);
+            const currentMarginPct = alert.variant?.price > 0 && alert.variant?.cogs != null
+              ? ((alert.variant.price - alert.variant.cogs) / alert.variant.price) * 100
+              : null;
+            const mc = marginColor(currentMarginPct);
             return (
               <div
                 key={alert.id}
@@ -155,17 +158,17 @@ export default function AlertsTab({ products }) {
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {alert.productTitle || alert.variantTitle || `Variant ${alert.variantId}`}
+                    {alert.variant?.product?.title || `Variant ${alert.variantId}`}
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 2 }}>
-                    Alert when below {formatPercent(alert.thresholdPct)}
+                    Alert when below {formatPercent(alert.threshold * 100)}
                   </div>
                 </div>
 
-                {alert.currentMargin != null && (
+                {currentMarginPct != null && (
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: 1 }}>Current</div>
-                    <div style={{ fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: mc }}>{formatPercent(alert.currentMargin)}</div>
+                    <div style={{ fontFamily: 'monospace', fontSize: '14px', fontWeight: 700, color: mc }}>{formatPercent(currentMarginPct)}</div>
                   </div>
                 )}
 

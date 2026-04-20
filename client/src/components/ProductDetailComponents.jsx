@@ -184,15 +184,17 @@ export function ProductDetailPanel({ product }) {
     setCostLogLoading(true);
     try {
       const d = await api.get(`/api/variants/${product.id}/cost-log`);
-      setCostLog(d.log || d || []);
+      setCostLog(d.logs || []);
     } catch { setCostLog([]); }
     finally { setCostLogLoading(false); }
   };
 
-  // SVG chart
+  // SVG chart — VariantSnapshot has price+cogs, not marginPercent; compute it
   const chartWidth = 400;
   const chartHeight = 80;
-  const validSnaps = snapshots.filter(s => s.marginPercent != null);
+  const validSnaps = snapshots
+    .map(s => ({ ...s, marginPercent: s.cogs != null && s.price > 0 ? ((s.price - s.cogs) / s.price) * 100 : null }))
+    .filter(s => s.marginPercent != null);
   const currentMargin = product.marginPercent;
 
   let change30d = null;

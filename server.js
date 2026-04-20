@@ -105,11 +105,7 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-// Support router (admin only)
-app.use("/api/support", requireAdmin, supportRouter);
-
-// New features router
-app.use("/api", require("./src/routes/newFeatures")(prisma, requireStore, handleShopifyError));
+// NOTE: support and newFeatures routers are mounted after middleware/helper definitions below
 
 // -----------------------------
 // Helpers
@@ -181,6 +177,12 @@ function handleShopifyError(error, res, shop) {
   }
   return null;
 }
+
+// Support router (admin only) — mounted after helpers are defined
+app.use("/api/support", requireAdmin, supportRouter);
+
+// New features router — mounted after helpers are defined
+app.use("/api", require("./src/routes/newFeatures")(prisma, requireStore, handleShopifyError));
 
 // -----------------------------
 // Paginated Shopify fetch
@@ -763,7 +765,7 @@ app.post("/api/deals/simulate", requireStore, async (req, res) => {
     });
     const tcp = results.reduce((s,r)=>s+(r.currentTotalProfit||0),0), tpp = results.reduce((s,r)=>s+(r.projectedDealProfit||0),0);
     res.json({ summary: { totalCurrentProfit:Math.round(tcp*100)/100, totalProjectedProfit:Math.round(tpp*100)/100, good:results.filter(r=>r.status==="good").length, risky:results.filter(r=>r.status==="risky").length, bad:results.filter(r=>r.status==="bad").length }, results });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { const h = handleShopifyError(e, res, req.store.shopDomain); if (h) return; res.status(500).json({ error: e.message }); }
 });
 
 // -----------------------------
