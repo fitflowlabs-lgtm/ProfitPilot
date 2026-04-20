@@ -9,7 +9,7 @@ export default function ProfitabilityPage() {
 
   useEffect(() => {
     api.get('/api/reports/profitability')
-      .then(d => setRows(d.products || d.rows || d || []))
+      .then(d => setRows(d.profitability || d.products || d.rows || []))
       .catch(e => setError(e.message || 'Failed to load profitability data.'))
       .finally(() => setLoading(false));
   }, []);
