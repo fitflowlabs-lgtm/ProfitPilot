@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../api.js';
 import { useAuth } from '../App.jsx';
-import { Card, Button, Alert, StatusBadge, Skeleton, PageHeader, formatCurrency, formatPercent, marginColor, MarginBar } from '../components/UI.jsx';
+import { Card, Button, Alert, StatusBadge, Skeleton, PageHeader, formatCurrency, formatPercent, marginColor, MarginBar, Badge } from '../components/UI.jsx';
+import { BreakEvenCard, PnLCard } from '../components/DashboardCards.jsx';
 
 /* ─── Health Score Ring ─── */
 function HealthRing({ score, loading }) {
@@ -188,6 +189,62 @@ function IssuesPanel({ summary, alerts, loading }) {
   );
 }
 
+/* ─── Top Products ─── */
+function TopProductsCard() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get('/api/reports/profitability')
+      .then(d => setRows((d.products || d.rows || d || []).slice(0, 10)))
+      .catch(() => setRows([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  return (
+    <Card style={{ marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div className="font-display" style={{ fontSize: '14px', fontWeight: 700 }}>Top Products</div>
+        <a href="/reports/profitability" style={{ fontSize: '12.5px', color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>View all →</a>
+      </div>
+      {loading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[1,2,3].map(i => <Skeleton key={i} height={36} />)}
+        </div>
+      ) : rows.length === 0 ? (
+        <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No profitability data yet.</div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: 460 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                {['#', 'Product', 'Units', 'Revenue', 'Gross Profit', 'Margin %'].map(h => (
+                  <th key={h} style={{ padding: '7px 10px', textAlign: h === '#' || h === 'Product' ? 'left' : 'right', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => {
+                const mc = marginColor(r.marginPercent);
+                return (
+                  <tr key={r.id || i} style={{ borderBottom: i < rows.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
+                    <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontSize: '12.5px', color: 'var(--text-muted)', fontWeight: 700 }}>{i + 1}</td>
+                    <td style={{ padding: '8px 10px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>{r.productTitle || r.title}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{(r.unitsSold ?? r.unitsSold30d ?? '—').toLocaleString?.() ?? '—'}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>{formatCurrency(r.revenue ?? r.revenue30d)}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: mc }}>{formatCurrency(r.grossProfit ?? r.profit)}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 700, color: mc }}>{formatPercent(r.marginPercent)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 /* ─── Main ─── */
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -279,6 +336,15 @@ export default function DashboardPage() {
         <AISummaryCard isPro={isPro} />
         <IssuesPanel summary={s} alerts={data?.alerts} loading={loading} />
       </div>
+
+      {/* Top Products */}
+      {!loading && <TopProductsCard />}
+
+      {/* Break-even */}
+      {!loading && <BreakEvenCard products={data?.products || []} />}
+
+      {/* P&L */}
+      {!loading && <PnLCard />}
 
       {/* Alerts list */}
       {!loading && (data?.alerts || []).length > 0 && (

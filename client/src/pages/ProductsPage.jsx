@@ -7,30 +7,10 @@ import {
   SearchInput, PageHeader, Tabs, formatCurrency, formatPercent,
   marginColor, marginStatus, MarginBar, Skeleton, Badge, Card
 } from '../components/UI.jsx';
-
-/* ─── Helpers ─── */
-const ANALYSIS_KEY = 'mp_ai_analysis';
-
-function loadSavedAnalyses() {
-  try { return JSON.parse(localStorage.getItem(ANALYSIS_KEY) || '{}'); } catch { return {}; }
-}
-
-function saveAnalysis(variantId, text) {
-  const all = loadSavedAnalyses();
-  all[variantId] = { text, savedAt: Date.now() };
-  localStorage.setItem(ANALYSIS_KEY, JSON.stringify(all));
-}
-
-function timeAgo(ts) {
-  if (!ts) return null;
-  const diff = Date.now() - ts;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
+import COGSImportModal from '../components/COGSImportModal.jsx';
+import AlertsTab from '../components/AlertsTab.jsx';
+import { AIAnalysisRow, ProductDetailPanel, loadSavedAnalyses } from '../components/ProductDetailComponents.jsx';
+import RecommendationsTab from '../components/RecommendationsTab.jsx';
 
 /* ─── Cost Edit Modal ─── */
 function CostEditModal({ product, onSave, onClose }) {
@@ -130,148 +110,13 @@ function CostEditModal({ product, onSave, onClose }) {
   );
 }
 
-/* ─── AI Analysis Accordion ─── */
-function AIAnalysisRow({ variantId, productTitle, isPro, analyses, onAnalyzed }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [displayed, setDisplayed] = useState('');
-  const saved = analyses[variantId];
-  const timerRef = useRef(null);
-
-  const runAnalysis = async () => {
-    if (!isPro) { window.location.href = '/pricing'; return; }
-    setLoading(true);
-    setError('');
-    setDisplayed('');
-    try {
-      const data = await api.post(`/api/ai/product/${variantId}`);
-      const text = data.analysis || data.text || '';
-      saveAnalysis(variantId, text);
-      onAnalyzed(variantId, text);
-      typewrite(text);
-    } catch (e) {
-      setError(e.message || 'Analysis failed.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const typewrite = (text) => {
-    let i = 0;
-    const tick = () => {
-      if (i <= text.length) {
-        setDisplayed(text.slice(0, i));
-        i++;
-        timerRef.current = setTimeout(tick, 10);
-      }
-    };
-    tick();
-  };
-
-  useEffect(() => {
-    if (saved?.text && !displayed) {
-      setDisplayed(saved.text);
-    }
-    return () => clearTimeout(timerRef.current);
-  }, []);
-
-  const textToShow = saved?.text || '';
-
-  return (
-    <div style={{ borderTop: '2px solid var(--accent-border)', background: 'linear-gradient(to right, rgba(26,92,56,0.04), transparent 60%)', animation: 'fadeIn 0.2s ease' }}>
-      <div style={{ padding: '16px 18px 16px 16px', display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-        {/* Left accent strip */}
-        <div style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, background: 'var(--accent)', flexShrink: 0, opacity: 0.5 }} />
-
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <div style={{ width: 22, height: 22, borderRadius: 6, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                <path d="M5.5 1l.8 1.8 2 .3-1.4 1.4.3 2L5.5 5.6 4 6.5l.3-2L2.9 3.1l2-.3L5.5 1z" fill="white" fillOpacity="0.9" />
-              </svg>
-            </div>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-              AI Analysis
-            </span>
-            {saved?.savedAt && (
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: 4 }}>
-                · saved {timeAgo(saved.savedAt)}
-              </span>
-            )}
-          </div>
-
-          {error && <div style={{ fontSize: '13px', color: 'var(--red)', marginBottom: 10, padding: '7px 10px', background: 'var(--red-bg)', borderRadius: 6, border: '1px solid var(--red-border)' }}>{error}</div>}
-
-          {loading && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-              {[1, 0.82, 0.68, 0.9, 0.55].map((w, i) => (
-                <div key={i} style={{ height: 11, borderRadius: 4, background: 'linear-gradient(90deg, rgba(26,92,56,0.06) 0%, rgba(26,92,56,0.12) 50%, rgba(26,92,56,0.06) 100%)', backgroundSize: '400px 100%', animation: 'shimmer 1.4s ease-in-out infinite', width: `${w * 100}%` }} />
-              ))}
-            </div>
-          )}
-
-          {!loading && textToShow && (
-            <div style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: 1.75, whiteSpace: 'pre-wrap', marginBottom: 12 }}>
-              {displayed || textToShow}
-              {displayed && displayed.length < textToShow.length && (
-                <span style={{ display: 'inline-block', width: 2, height: 13, background: 'var(--accent)', marginLeft: 2, verticalAlign: 'text-bottom', animation: 'blink 1s step-end infinite' }} />
-              )}
-            </div>
-          )}
-
-          {!loading && !textToShow && !error && (
-            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.6 }}>
-              {isPro
-                ? 'Get an AI-powered breakdown of this product\'s profitability, suggested pricing, and cost reduction opportunities.'
-                : 'Upgrade to Pro to unlock per-product AI analysis — pricing recommendations, profitability insights, and more.'}
-            </div>
-          )}
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {isPro ? (
-              <button
-                onClick={runAnalysis}
-                disabled={loading}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '6px 14px', borderRadius: 6, fontSize: '13px', fontWeight: 600,
-                  background: loading ? 'var(--surface-raised)' : 'var(--accent)',
-                  color: loading ? 'var(--text-muted)' : '#fff',
-                  border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
-                  transition: 'var(--transition)', fontFamily: "'Plus Jakarta Sans', sans-serif",
-                }}
-                onMouseEnter={e => { if (!loading) e.currentTarget.style.background = 'var(--accent-hover)'; }}
-                onMouseLeave={e => { if (!loading) e.currentTarget.style.background = 'var(--accent)'; }}
-              >
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                  <path d="M6 1l.8 1.8 2 .3-1.4 1.4.3 2L6 5.6 4.3 6.5l.3-2L3.2 3.1l2-.3L6 1z" fill="currentColor" fillOpacity="0.9" />
-                </svg>
-                {loading ? 'Analyzing…' : textToShow ? 'Re-analyze' : 'Analyze this product'}
-              </button>
-            ) : (
-              <button
-                onClick={() => window.location.href = '/pricing'}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 6, fontSize: '13px', fontWeight: 600, background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'var(--transition)' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--accent-hover)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'var(--accent)'}
-              >
-                Upgrade to Pro
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ─── Products Tab ─── */
 function ProductsTab({ products, loading, onCostSaved, saving, isPro }) {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [costModal, setCostModal] = useState(null);
   const [expandedAI, setExpandedAI] = useState({});
+  const [expandedDetail, setExpandedDetail] = useState({});
   const [analyses, setAnalyses] = useState(loadSavedAnalyses);
 
   const handleAnalyzed = (variantId, text) => {
@@ -333,23 +178,30 @@ function ProductsTab({ products, loading, onCostSaved, saving, isPro }) {
       ) : (
         <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: 'var(--surface)' }}>
           {/* Table header */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.2fr 1.5fr 1fr 80px', gap: 0, padding: '8px 16px', background: 'var(--surface-raised)', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.2fr 1.5fr 1fr 120px', gap: 0, padding: '8px 16px', background: 'var(--surface-raised)', borderBottom: '1px solid var(--border)' }}>
             {['Product', 'SKU', 'Price', 'Cost', 'Margin', 'Status', ''].map(h => (
               <div key={h} style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>{h}</div>
             ))}
           </div>
           {filtered.map((p, i) => {
             const isExpanded = expandedAI[p.id];
+            const isDetailExpanded = expandedDetail[p.id];
             return (
               <div key={p.id} style={{ borderBottom: i < filtered.length - 1 ? '1px solid var(--border-subtle)' : 'none' }}>
                 <div
-                  style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.2fr 1.5fr 1fr 80px', gap: 0, padding: '11px 16px', transition: 'background 0.15s ease', cursor: 'default', alignItems: 'center' }}
+                  style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1.2fr 1.5fr 1fr 120px', gap: 0, padding: '11px 16px', transition: 'background 0.15s ease', cursor: 'default', alignItems: 'center' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-raised)'}
                   onMouseLeave={e => e.currentTarget.style.background = ''}
                 >
-                  {/* Product name */}
+                  {/* Product name — click to expand details */}
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.productTitle}</div>
+                    <button
+                      onClick={() => setExpandedDetail(prev => ({ ...prev, [p.id]: !prev[p.id] }))}
+                      title="View margin trend and cost history"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, textAlign: 'left', width: '100%' }}
+                    >
+                      <div style={{ fontSize: '13.5px', fontWeight: 600, color: isDetailExpanded ? 'var(--accent)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.productTitle}</div>
+                    </button>
                     {p.variantTitle && p.variantTitle !== 'Default' && <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>{p.variantTitle}</div>}
                   </div>
                   {/* SKU */}
@@ -377,8 +229,8 @@ function ProductsTab({ products, loading, onCostSaved, saving, isPro }) {
                   <div>
                     <StatusBadge variant={p.cost == null ? 'missing_cost' : marginStatus(p.marginPercent)} />
                   </div>
-                  {/* AI toggle */}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  {/* AI toggle + Details */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 4 }}>
                     <button
                       onClick={() => setExpandedAI(prev => ({ ...prev, [p.id]: !prev[p.id] }))}
                       title="AI Analysis"
@@ -401,6 +253,8 @@ function ProductsTab({ products, loading, onCostSaved, saving, isPro }) {
                     </button>
                   </div>
                 </div>
+                {/* Detail panel (margin trend / cost history) */}
+                {isDetailExpanded && <ProductDetailPanel product={p} />}
                 {/* AI analysis row */}
                 {isExpanded && (
                   <AIAnalysisRow
@@ -419,7 +273,7 @@ function ProductsTab({ products, loading, onCostSaved, saving, isPro }) {
 
       {!loading && filtered.length > 0 && (
         <div style={{ marginTop: 8, fontSize: '12px', color: 'var(--text-muted)' }}>
-          {filtered.length} of {products.length} products · Click cost to edit · Click AI to analyze
+          {filtered.length} of {products.length} products · Click product name to view trend · Click cost to edit · Click AI to analyze
         </div>
       )}
 
@@ -436,143 +290,26 @@ function ProductsTab({ products, loading, onCostSaved, saving, isPro }) {
   );
 }
 
-/* ─── Recommendations Tab ─── */
-function RecommendationsTab({ products, loading, isPro }) {
-  const [recs, setRecs] = useState([]);
-  const [recsLoading, setRecsLoading] = useState(true);
-  const [applying, setApplying] = useState({});
-  const [undoing, setUndoing] = useState({});
-  const [bulkLoading, setBulkLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
-  const savedAnalyses = loadSavedAnalyses();
-
-  useEffect(() => {
-    const load = async () => {
-      setRecsLoading(true);
-      try {
-        const data = await api.get('/api/recommendations');
-        setRecs(data.recommendations || []);
-      } catch (e) {
-        setError(e.message);
-      } finally {
-        setRecsLoading(false);
-      }
-    };
-    load();
-  }, []);
-
-  const handleApply = async (variantId, price) => {
-    setApplying(s => ({ ...s, [variantId]: true }));
-    try {
-      await api.post('/api/prices/apply', { variantId, price });
-      setRecs(prev => prev.map(r => r.variantId === variantId ? { ...r, applied: true } : r));
-      setSuccessMsg('Price applied.');
-      setTimeout(() => setSuccessMsg(''), 3000);
-    } catch (e) { setError(e.message); }
-    finally { setApplying(s => ({ ...s, [variantId]: false })); }
-  };
-
-  const handleUndo = async (variantId) => {
-    setUndoing(s => ({ ...s, [variantId]: true }));
-    try {
-      await api.post(`/api/prices/undo/${variantId}`);
-      setRecs(prev => prev.map(r => r.variantId === variantId ? { ...r, applied: false } : r));
-      setSuccessMsg('Price restored.');
-      setTimeout(() => setSuccessMsg(''), 3000);
-    } catch (e) { setError(e.message); }
-    finally { setUndoing(s => ({ ...s, [variantId]: false })); }
-  };
-
-  const handleApplyAll = async () => {
-    setBulkLoading(true);
-    try {
-      await api.post('/api/prices/apply-all');
-      setRecs(prev => prev.map(r => ({ ...r, applied: true })));
-      setSuccessMsg(`Applied all price changes.`);
-      setTimeout(() => setSuccessMsg(''), 4000);
-    } catch (e) { setError(e.message); }
-    finally { setBulkLoading(false); }
-  };
-
-  const pending = recs.filter(r => !r.applied && r.suggestedPrice);
-
-  return (
-    <div>
-      {(error || successMsg) && (
-        <div style={{ marginBottom: 14 }}>
-          {error && <Alert type="error" message={error} onDismiss={() => setError('')} />}
-          {successMsg && <Alert type="success" message={successMsg} />}
-        </div>
-      )}
-
-      {pending.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <span style={{ fontSize: '13.5px', color: 'var(--text-secondary)' }}>
-            <span className="mono" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{pending.length}</span> product{pending.length !== 1 ? 's' : ''} need pricing attention
-          </span>
-          <Button size="sm" loading={bulkLoading} onClick={handleApplyAll}>Apply all {pending.length}</Button>
-        </div>
-      )}
-
-      {recsLoading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {[1,2,3,4].map(i => <Skeleton key={i} height={80} style={{ borderRadius: 10 }} />)}
-        </div>
-      ) : recs.length === 0 ? (
-        <EmptyState icon="✓" title="All products are optimally priced" description="Every product is hitting the 60% margin target." />
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {recs.map(rec => {
-            const hasAI = !!savedAnalyses[rec.variantId];
-            const isUnusual = rec.unusualCost;
-            return (
-              <div
-                key={rec.variantId}
-                style={{ background: 'var(--surface)', border: `1px solid ${isUnusual ? 'var(--yellow-border)' : 'var(--border)'}`, borderRadius: 'var(--radius-lg)', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16, boxShadow: 'var(--shadow-sm)' }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                    <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rec.productTitle}</span>
-                    {isUnusual && <Badge color="yellow">Unusual cost</Badge>}
-                    {hasAI && <Badge color="accent">AI analyzed</Badge>}
-                  </div>
-                  {rec.sku && rec.sku !== 'Default' && <div className="mono" style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>{rec.sku}</div>}
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 4 }}>{rec.recommendation}</div>
-                </div>
-
-                {rec.suggestedPrice && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginBottom: 1 }}>Now</div>
-                      <div className="mono" style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-secondary)', textDecoration: rec.applied ? 'line-through' : 'none', opacity: rec.applied ? 0.6 : 1 }}>{formatCurrency(rec.currentPrice)}</div>
-                      <div style={{ fontSize: '11px', color: marginColor(rec.currentMargin) }}>{rec.currentMargin != null ? formatPercent(rec.currentMargin) : 'No cost'}</div>
-                    </div>
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="var(--accent)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                    <div>
-                      <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginBottom: 1 }}>Suggested</div>
-                      <div className="mono" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--accent)' }}>{formatCurrency(rec.suggestedPrice)}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--green)' }}>~60% margin</div>
-                    </div>
-                  </div>
-                )}
-
-                <div style={{ flexShrink: 0 }}>
-                  {rec.status === 'missing_cost' ? (
-                    <Badge color="neutral">Set cost first</Badge>
-                  ) : rec.applied ? (
-                    <Button variant="secondary" size="sm" loading={undoing[rec.variantId]} onClick={() => handleUndo(rec.variantId)}>Undo</Button>
-                  ) : rec.suggestedPrice ? (
-                    <Button size="sm" loading={applying[rec.variantId]} onClick={() => handleApply(rec.variantId, rec.suggestedPrice)}>Apply</Button>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
+/* ─── CSV Export ─── */
+function exportProductsCSV(products) {
+  const header = 'Product,SKU,Price,COGS,Margin %,Units Sold 30d,Revenue 30d';
+  const rows = products.map(p => [
+    `"${(p.productTitle || '').replace(/"/g, '""')}"`,
+    p.sku || '',
+    p.price != null ? p.price.toFixed(2) : '',
+    p.cost != null ? p.cost.toFixed(2) : '',
+    p.marginPercent != null ? p.marginPercent.toFixed(1) : '',
+    p.unitsSold30d ?? '',
+    p.revenue30d != null ? p.revenue30d.toFixed(2) : '',
+  ].join(','));
+  const csv = [header, ...rows].join('\n');
+  const date = new Date().toISOString().slice(0, 10);
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `margin-pilot-products-${date}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 /* ─── Main ─── */
@@ -583,6 +320,7 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState({});
+  const [cogsModalOpen, setCogsModalOpen] = useState(false);
   const isPro = user?.plan === 'pro';
 
   const tabFromUrl = searchParams.get('tab') || 'products';
@@ -625,13 +363,21 @@ export default function ProductsPage() {
         title="Products"
         subtitle="Manage costs, track margins, and optimize prices"
         actions={
-          <Button variant="secondary" size="sm" loading={syncing} onClick={handleSyncAndReload}>
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <path d="M11.5 2.5A5.5 5.5 0 0 0 1 6.5M1.5 10.5A5.5 5.5 0 0 0 12 6.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-              <path d="M11 0.5v2.5H8.5M2 12.5v-2.5H4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Sync
-          </Button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button variant="secondary" size="sm" onClick={() => exportProductsCSV(products)}>
+              Export CSV
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => setCogsModalOpen(true)}>
+              Import COGS
+            </Button>
+            <Button variant="secondary" size="sm" loading={syncing} onClick={handleSyncAndReload}>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <path d="M11.5 2.5A5.5 5.5 0 0 0 1 6.5M1.5 10.5A5.5 5.5 0 0 0 12 6.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                <path d="M11 0.5v2.5H8.5M2 12.5v-2.5H4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Sync
+            </Button>
+          </div>
         }
       />
 
@@ -641,6 +387,7 @@ export default function ProductsPage() {
         tabs={[
           { id: 'products', label: 'Products', count: products.length },
           { id: 'recommendations', label: 'Recommendations', count: recsCount || undefined },
+          { id: 'alerts', label: 'Alerts' },
         ]}
         activeTab={tab}
         onChange={setTab}
@@ -658,6 +405,15 @@ export default function ProductsPage() {
       {tab === 'recommendations' && (
         <RecommendationsTab products={products} loading={loading} isPro={isPro} />
       )}
+      {tab === 'alerts' && (
+        <AlertsTab products={products} />
+      )}
+
+      <COGSImportModal
+        isOpen={cogsModalOpen}
+        onClose={() => setCogsModalOpen(false)}
+        onImported={load}
+      />
     </div>
   );
 }

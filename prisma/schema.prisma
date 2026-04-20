@@ -48,10 +48,12 @@ model Store {
   lastOrdersSyncAt DateTime?
   userId      String?
 
-  user        User?     @relation(fields: [userId], references: [id])
-  products    Product[]
-  variants    Variant[]
-  orders      Order[]
+  user             User?             @relation(fields: [userId], references: [id])
+  products         Product[]
+  variants         Variant[]
+  orders           Order[]
+  marginAlerts     MarginAlert[]
+  supplierCostLogs SupplierCostLog[]
 }
 
 model Product {
@@ -78,10 +80,12 @@ model Variant {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
-  product          Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  store            Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  product          Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  store            Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
   orderItems       OrderItem[]
   snapshots        VariantSnapshot[]
+  marginAlerts     MarginAlert[]
+  supplierCostLogs SupplierCostLog[]
 }
 
 model Order {
@@ -116,6 +120,7 @@ model OrderItem {
 model VariantSnapshot {
   id            String    @id @default(cuid())
   variantId     String
+  storeId       String?
   price         Float
   cogs          Float?
   inventoryQty  Int
@@ -124,6 +129,39 @@ model VariantSnapshot {
   capturedAt    DateTime  @default(now())
 
   variant       Variant   @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([variantId, capturedAt])
+  @@index([storeId])
+}
+
+model MarginAlert {
+  id          String    @id @default(cuid())
+  storeId     String
+  variantId   String
+  threshold   Float
+  lastFiredAt DateTime?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  variant Variant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+}
+
+model SupplierCostLog {
+  id        String   @id @default(cuid())
+  variantId String
+  storeId   String
+  oldCogs   Float?
+  newCogs   Float
+  note      String?
+  loggedAt  DateTime @default(now())
+
+  variant Variant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  store   Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([variantId])
 }
 
 model OAuthState {
