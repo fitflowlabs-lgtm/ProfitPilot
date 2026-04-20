@@ -1,27 +1,30 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../api.js';
 import { useAuth } from '../App.jsx';
 import { Button, Alert, Card, Badge, PageHeader, Skeleton } from '../components/UI.jsx';
 
 function Section({ title, description, children }) {
   return (
-    <Card style={{ marginBottom: 16 }}>
-      <div style={{ marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid var(--border-subtle)' }}>
-        <div className="font-display" style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3 }}>{title}</div>
-        {description && <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{description}</div>}
+    <div style={{ marginBottom: 24 }}>
+      <div style={{ marginBottom: 10 }}>
+        <div className="font-display" style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{title}</div>
+        {description && <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: 2 }}>{description}</div>}
       </div>
-      {children}
-    </Card>
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+        {children}
+      </div>
+    </div>
   );
 }
 
-function FieldRow({ label, value, action, subtext }) {
+function FieldRow({ label, value, action, subtext, last }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border-subtle)', gap: 12 }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: last ? 'none' : '1px solid var(--border-subtle)', gap: 12 }}>
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 2 }}>{label}</div>
+        <div style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
         <div style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: 500 }}>{value}</div>
-        {subtext && <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 2 }}>{subtext}</div>}
+        {subtext && <div style={{ fontSize: '12px', color: 'var(--yellow)', marginTop: 3 }}>{subtext}</div>}
       </div>
       {action && <div style={{ flexShrink: 0 }}>{action}</div>}
     </div>
@@ -97,21 +100,21 @@ export default function SettingsPage() {
   const plan = isPro ? 'Pro' : 'Free';
 
   return (
-    <div className="page-content" style={{ maxWidth: 680 }}>
+    <div className="page-content" style={{ maxWidth: 620 }}>
       <PageHeader title="Settings" subtitle="Manage your account, store, and subscription" />
 
       {(error || successMsg) && (
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 20 }}>
           {error && <Alert type="error" message={error} onDismiss={() => setError('')} />}
           {successMsg && <Alert type="success" message={successMsg} />}
         </div>
       )}
 
       {/* Profile */}
-      <Section title="Profile" description="Your account details">
+      <Section title="Profile">
         {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <Skeleton height={40} /><Skeleton height={40} /><Skeleton height={40} />
+          <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <Skeleton height={40} /><Skeleton height={40} />
           </div>
         ) : (
           <>
@@ -121,36 +124,32 @@ export default function SettingsPage() {
               value={email}
               subtext={isVerified ? undefined : 'Not verified — check your inbox'}
               action={
-                !isVerified && (
-                  <Button variant="secondary" size="sm" loading={resendLoading} onClick={handleResendVerification}>
-                    Resend verification
-                  </Button>
-                )
+                isVerified
+                  ? <Badge color="green">Verified</Badge>
+                  : <Button variant="secondary" size="sm" loading={resendLoading} onClick={handleResendVerification}>Resend</Button>
               }
+              last
             />
-            <div style={{ paddingTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Email status:</span>
-              {isVerified ? (
-                <Badge color="green">Verified</Badge>
-              ) : (
-                <Badge color="yellow">Unverified</Badge>
-              )}
-            </div>
           </>
         )}
       </Section>
 
       {/* Subscription */}
-      <Section title="Subscription" description="Your current plan and billing">
+      <Section title="Subscription">
         {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             <Skeleton height={40} /><Skeleton height={36} />
           </div>
         ) : (
           <>
             <FieldRow
               label="Current plan"
-              value={plan}
+              value={
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  {plan}
+                  {isPro && <Badge color="green">Active</Badge>}
+                </span>
+              }
               action={
                 isPro ? (
                   <Button variant="secondary" size="sm" loading={portalLoading} onClick={handleBillingPortal}>
@@ -167,29 +166,30 @@ export default function SettingsPage() {
               <FieldRow
                 label="Renews"
                 value={new Date(subscription.currentPeriodEnd * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                last
               />
             )}
             {!isPro && (
-              <div style={{ marginTop: 16, padding: '14px', borderRadius: 10, background: 'var(--accent-subtle)', border: '1px solid var(--accent-border)' }}>
-                <div style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--accent)', marginBottom: 4 }}>Pro includes:</div>
-                <ul style={{ display: 'flex', flexDirection: 'column', gap: 5, marginLeft: 4 }}>
-                  {['AI executive store summaries', 'Per-product AI analysis', 'AI inventory insights', 'Deal simulation with sales lift prediction'].map(f => (
-                    <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: '13px', color: 'var(--accent)' }}>
+              <div style={{ padding: '14px 18px', borderTop: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--accent)', marginBottom: 8 }}>Pro includes</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {['AI executive store summaries', 'Per-product AI analysis', 'AI inventory insights', 'Deal simulation with lift prediction'].map(f => (
+                    <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '13px', color: 'var(--text-secondary)' }}>
                       <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                         <path d="M2 6l3 3 5-5" stroke="var(--accent)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                       {f}
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             )}
           </>
         )}
       </Section>
 
-      {/* Store */}
-      <Section title="Connected Store" description="Your Shopify store connection">
+      {/* Connected Store */}
+      <Section title="Connected Store">
         {store ? (
           <>
             <FieldRow
@@ -201,17 +201,18 @@ export default function SettingsPage() {
                   <span style={{ fontSize: '12.5px', color: 'var(--green)', fontWeight: 600 }}>Connected</span>
                 </div>
               }
+              last
             />
-            <div style={{ marginTop: 14 }}>
+            <div style={{ padding: '12px 18px', borderTop: '1px solid var(--border-subtle)' }}>
               <Button variant="secondary" size="sm" onClick={() => window.location.href = '/auth'}>
                 Reconnect store
               </Button>
             </div>
           </>
         ) : (
-          <div style={{ padding: '16px 0' }}>
+          <div style={{ padding: '20px 18px' }}>
             <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', marginBottom: 14 }}>
-              No Shopify store connected. Connect a store to start syncing products and orders.
+              No Shopify store connected. Connect one to start syncing.
             </p>
             <Button size="sm" onClick={() => window.location.href = '/auth'}>
               Connect Shopify store
@@ -220,15 +221,33 @@ export default function SettingsPage() {
         )}
       </Section>
 
-      {/* Danger Zone */}
-      <Section title="Account" description="Account management options">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Support */}
+      <Section title="Support">
+        <div style={{ padding: '14px 18px' }}>
           <div style={{ fontSize: '13.5px', color: 'var(--text-secondary)' }}>
-            Need help? Contact us at{' '}
+            Questions or issues? Reach us at{' '}
             <a href="mailto:support@marginpilot.app" style={{ color: 'var(--accent)', fontWeight: 600 }}>
               support@marginpilot.app
             </a>
           </div>
+        </div>
+      </Section>
+
+      {/* Legal */}
+      <Section title="Legal">
+        <div style={{ padding: '14px 18px', display: 'flex', gap: 20 }}>
+          <Link to="/terms" style={{ fontSize: '13.5px', color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
+            onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+            onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+          >
+            Terms of Service
+          </Link>
+          <Link to="/privacy" style={{ fontSize: '13.5px', color: 'var(--text-secondary)', fontWeight: 500, textDecoration: 'none' }}
+            onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
+            onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
+          >
+            Privacy Policy
+          </Link>
         </div>
       </Section>
     </div>

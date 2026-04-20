@@ -98,15 +98,6 @@ export default function LoginPage() {
             Create an account
           </Link>
         </p>
-        <p style={{ textAlign: 'center', marginTop: 8, fontSize: '13.5px', color: 'var(--text-muted)' }}>
-          Installing via Shopify?{' '}
-          <a href="/auth" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
-            onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
-            onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
-          >
-            Connect your store
-          </a>
-        </p>
       </div>
     </div>
   );

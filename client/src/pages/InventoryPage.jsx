@@ -78,7 +78,7 @@ export default function InventoryPage() {
     setError('');
     try {
       const data = await api.get('/api/inventory');
-      setInventory(data.inventory || []);
+      setInventory(data.items || []);
     } catch (e) {
       setError(e.message || 'Failed to load inventory.');
     } finally {
